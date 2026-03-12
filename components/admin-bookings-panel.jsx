@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BOOKING_STATUSES, BOOKING_STATUS_LABELS } from "../lib/booking-status";
 
 function formatDate(date, time) {
@@ -88,6 +88,10 @@ function createQueryString(filters) {
   return params.toString();
 }
 
+function getStatusLabel(status) {
+  return BOOKING_STATUS_LABELS[status] || status;
+}
+
 export default function AdminBookingsPanel() {
   const todayDateKey = new Date().toISOString().slice(0, 10);
 
@@ -101,6 +105,8 @@ export default function AdminBookingsPanel() {
   const [exporting, setExporting] = useState(false);
   const [draggingBooking, setDraggingBooking] = useState(null);
   const [dragTargetStatus, setDragTargetStatus] = useState(null);
+  const [undoState, setUndoState] = useState(null);
+  const undoTimerRef = useRef(null);
 
   const [filters, setFilters] = useState({
     q: "",
@@ -112,6 +118,15 @@ export default function AdminBookingsPanel() {
   const [statusDrafts, setStatusDrafts] = useState({});
   const [calendarWeekStart, setCalendarWeekStart] = useState(getWeekStart(todayDateKey));
   const [weeklyViewMode, setWeeklyViewMode] = useState("days");
+
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
+      }
+    },
+    []
+  );
 
   const sortedBookings = useMemo(
     () => [...bookings].sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b)),
@@ -305,6 +320,7 @@ export default function AdminBookingsPanel() {
       }
 
       const nextBookings = payload.bookings || [];
+      clearUndoState();
       setBookings(nextBookings);
       setDraggingBooking(null);
       setDragTargetStatus(null);
@@ -325,7 +341,26 @@ export default function AdminBookingsPanel() {
     }
   }
 
-  async function updateBookingStatus(bookingId, nextStatus, source = "panel") {
+  function clearUndoState() {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setUndoState(null);
+  }
+
+  function openUndoState(nextUndoState) {
+    clearUndoState();
+    setUndoState(nextUndoState);
+
+    undoTimerRef.current = setTimeout(() => {
+      setUndoState(null);
+      undoTimerRef.current = null;
+    }, 5000);
+  }
+
+  async function updateBookingStatus(bookingId, nextStatus, source = "panel", options = {}) {
+    const { fromStatus, allowUndo = true } = options;
     if (!nextStatus) return;
 
     setUpdatingId(bookingId);
@@ -361,10 +396,20 @@ export default function AdminBookingsPanel() {
         [bookingId]: payload.booking.status
       }));
 
-      const statusLabel = BOOKING_STATUS_LABELS[payload.booking.status] || payload.booking.status;
+      if (allowUndo && fromStatus && fromStatus !== payload.booking.status) {
+        openUndoState({
+          bookingId,
+          fromStatus,
+          toStatus: payload.booking.status
+        });
+      }
+
+      const statusLabel = getStatusLabel(payload.booking.status);
       setStatusText(
         source === "drag"
           ? `Turno #${bookingId} movido a ${statusLabel}.`
+          : source === "undo"
+            ? `Cambio revertido. Reserva #${bookingId} en ${statusLabel}.`
           : `Reserva #${bookingId} actualizada a ${statusLabel}.`
       );
     } catch (error) {
@@ -376,7 +421,22 @@ export default function AdminBookingsPanel() {
 
   async function handleStatusUpdate(bookingId) {
     const nextStatus = statusDrafts[bookingId];
-    await updateBookingStatus(bookingId, nextStatus, "panel");
+    const current = bookings.find((booking) => String(booking.id) === String(bookingId));
+    await updateBookingStatus(bookingId, nextStatus, "panel", {
+      fromStatus: current?.status
+    });
+  }
+
+  async function handleUndoStatusChange() {
+    if (!undoState) return;
+
+    const { bookingId, fromStatus, toStatus } = undoState;
+    clearUndoState();
+
+    await updateBookingStatus(bookingId, fromStatus, "undo", {
+      fromStatus: toStatus,
+      allowUndo: false
+    });
   }
 
   async function handleDeleteBooking(bookingId) {
@@ -504,7 +564,9 @@ export default function AdminBookingsPanel() {
       return;
     }
 
-    await updateBookingStatus(draggingBooking.id, targetStatus, "drag");
+    await updateBookingStatus(draggingBooking.id, targetStatus, "drag", {
+      fromStatus: draggingBooking.status
+    });
     setDraggingBooking(null);
     setDragTargetStatus(null);
   }
@@ -640,6 +702,22 @@ export default function AdminBookingsPanel() {
       </div>
 
       <p className="admin-status">{statusText}</p>
+
+      {undoState ? (
+        <aside className="admin-toast" role="status" aria-live="polite">
+          <p>
+            Estado actualizado a <strong>{getStatusLabel(undoState.toStatus)}</strong>.
+          </p>
+          <div className="admin-toast-actions">
+            <button className="btn btn-secondary" type="button" onClick={handleUndoStatusChange}>
+              Deshacer
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={clearUndoState}>
+              Cerrar
+            </button>
+          </div>
+        </aside>
+      ) : null}
 
       <div className="admin-kpis">
         <article className="admin-kpi">

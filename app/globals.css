@@ -997,6 +997,29 @@ select:focus {
   color: var(--color-text-muted);
 }
 
+.admin-toast {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #f7f4ef;
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.admin-toast p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+}
+
+.admin-toast-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .admin-table-wrap {
   overflow: auto;
   border: 1px solid var(--color-border);
