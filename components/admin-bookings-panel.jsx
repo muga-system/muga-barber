@@ -28,6 +28,24 @@ function formatCreatedAt(value) {
   });
 }
 
+function normalizeDateKey(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function toAppointmentTimestamp(booking) {
+  const dateKey = normalizeDateKey(booking.appointment_date);
+  const time = booking.appointment_time || "00:00";
+  const parsed = new Date(`${dateKey}T${time}:00`);
+
+  if (Number.isNaN(parsed.getTime())) return 0;
+  return parsed.getTime();
+}
+
 export default function AdminBookingsPanel() {
   const [authState, setAuthState] = useState("checking");
   const [authKey, setAuthKey] = useState("");
@@ -47,7 +65,36 @@ export default function AdminBookingsPanel() {
 
   const [statusDrafts, setStatusDrafts] = useState({});
 
-  const hasBookings = bookings.length > 0;
+  const sortedBookings = useMemo(
+    () => [...bookings].sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b)),
+    [bookings]
+  );
+
+  const hasBookings = sortedBookings.length > 0;
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+
+  const stats = useMemo(() => {
+    const base = {
+      total: bookings.length,
+      pending: 0,
+      confirmed: 0,
+      completed: 0,
+      cancelled: 0
+    };
+
+    bookings.forEach((booking) => {
+      if (booking.status && booking.status in base) {
+        base[booking.status] += 1;
+      }
+    });
+
+    return base;
+  }, [bookings]);
+
+  const agendaToday = useMemo(
+    () => sortedBookings.filter((booking) => normalizeDateKey(booking.appointment_date) === todayDateKey),
+    [sortedBookings, todayDateKey]
+  );
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -351,6 +398,35 @@ export default function AdminBookingsPanel() {
           <button className="btn btn-primary" type="submit" disabled={loadingBookings}>
             {loadingBookings ? "Filtrando..." : "Aplicar filtros"}
           </button>
+
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() =>
+              setFilters((current) => ({
+                ...current,
+                from: todayDateKey,
+                to: todayDateKey
+              }))
+            }
+          >
+            Hoy
+          </button>
+
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() =>
+              setFilters({
+                q: "",
+                status: "all",
+                from: "",
+                to: ""
+              })
+            }
+          >
+            Limpiar
+          </button>
         </form>
 
         <div className="admin-toolbar-actions">
@@ -369,6 +445,53 @@ export default function AdminBookingsPanel() {
       </div>
 
       <p className="admin-status">{statusText}</p>
+
+      <div className="admin-kpis">
+        <article className="admin-kpi">
+          <h2>Total</h2>
+          <p>{stats.total}</p>
+        </article>
+        <article className="admin-kpi">
+          <h2>Pendientes</h2>
+          <p>{stats.pending}</p>
+        </article>
+        <article className="admin-kpi">
+          <h2>Confirmadas</h2>
+          <p>{stats.confirmed}</p>
+        </article>
+        <article className="admin-kpi">
+          <h2>Completadas</h2>
+          <p>{stats.completed}</p>
+        </article>
+        <article className="admin-kpi">
+          <h2>Canceladas</h2>
+          <p>{stats.cancelled}</p>
+        </article>
+      </div>
+
+      <section className="admin-agenda" aria-label="Agenda del dia">
+        <h2>Agenda de hoy</h2>
+        {agendaToday.length === 0 ? (
+          <p className="admin-status">No hay turnos cargados para hoy.</p>
+        ) : (
+          <ul className="admin-agenda-list">
+            {agendaToday.map((booking) => (
+              <li key={`agenda-${booking.id}`} className="admin-agenda-item">
+                <p className="admin-agenda-time">{booking.appointment_time}</p>
+                <div>
+                  <strong>{booking.name}</strong>
+                  <p>
+                    {booking.service} · {booking.barber}
+                  </p>
+                </div>
+                <span className={`status-pill status-${booking.status || "pending"}`}>
+                  {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -391,7 +514,7 @@ export default function AdminBookingsPanel() {
                 <td colSpan={9}>Sin datos para mostrar.</td>
               </tr>
             ) : (
-              bookings.map((booking) => {
+              sortedBookings.map((booking) => {
                 const draftStatus = statusDrafts[booking.id] || booking.status || "pending";
 
                 return (
