@@ -25,8 +25,8 @@ const INITIAL_FORM = {
   time: ""
 };
 
-function buildMessage(formData) {
-  return [
+function buildMessage(formData, bookingId) {
+  const details = [
     "Hola, quiero reservar un turno en Muga Barber:",
     `Nombre: ${formData.name}`,
     `Telefono: ${formData.phone}`,
@@ -34,7 +34,13 @@ function buildMessage(formData) {
     `Barbero: ${formData.barber}`,
     `Fecha: ${formData.date}`,
     `Hora: ${formData.time}`
-  ].join("\n");
+  ];
+
+  if (bookingId) {
+    details.push(`Codigo de reserva: #${bookingId}`);
+  }
+
+  return details.join("\n");
 }
 
 function getTodayISODate() {
@@ -44,6 +50,7 @@ function getTodayISODate() {
 export default function BookingForm({ whatsappNumber }) {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [notice, setNotice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const minDate = useMemo(() => getTodayISODate(), []);
 
   const isValid =
@@ -59,8 +66,12 @@ export default function BookingForm({ whatsappNumber }) {
     setFormData((current) => ({ ...current, [name]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
 
     if (!isValid) {
       setNotice("Revisa los campos obligatorios para continuar.");
@@ -68,19 +79,46 @@ export default function BookingForm({ whatsappNumber }) {
       return;
     }
 
-    const message = buildMessage(formData);
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    setIsSubmitting(true);
+    setNotice("Guardando tu reserva...");
 
-    trackEvent("submit_reserva", {
-      service: formData.service,
-      barber: formData.barber,
-      time: formData.time
-    });
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
 
-    setNotice("Turno listo. Te redirigimos a WhatsApp para confirmar.");
-    window.open(url, "_blank", "noopener,noreferrer");
-    trackEvent("whatsapp_open", { source: "booking_form" });
-    setFormData(INITIAL_FORM);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo registrar la reserva.");
+      }
+
+      trackEvent("submit_reserva", {
+        service: formData.service,
+        barber: formData.barber,
+        time: formData.time
+      });
+
+      trackEvent("booking_api_saved", {
+        bookingId: payload.bookingId,
+        service: formData.service
+      });
+
+      const message = buildMessage(formData, payload.bookingId);
+      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+
+      setNotice("Reserva guardada. Te redirigimos a WhatsApp para confirmar.");
+      trackEvent("whatsapp_open", { source: "booking_form" });
+      setFormData(INITIAL_FORM);
+      window.location.assign(url);
+    } catch (error) {
+      setNotice(error.message || "No pudimos guardar tu reserva.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -161,8 +199,8 @@ export default function BookingForm({ whatsappNumber }) {
         </label>
       </div>
 
-      <button className="btn btn-primary" type="submit">
-        Reservar turno
+      <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Guardando..." : "Reservar turno"}
       </button>
       <p className="form-privacy">Tus datos se usan solo para confirmar tu turno.</p>
       <p className="form-note" role="status" aria-live="polite">
