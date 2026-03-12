@@ -627,6 +627,58 @@ select:focus {
   margin: 0;
 }
 
+.admin-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.admin-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.admin-form label {
+  min-width: 280px;
+  flex: 1;
+}
+
+.admin-status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.admin-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 880px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.75rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-soft);
+  font-size: 0.9rem;
+}
+
+.admin-table th {
+  background: var(--color-surface-strong);
+  font-weight: 700;
+}
+
 .pricing-meta {
   color: var(--color-text-muted);
   font-weight: 600;

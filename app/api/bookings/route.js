@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "../../../lib/db";
 
+const adminKey = process.env.ADMIN_DASHBOARD_KEY;
+
 const bookingSchema = z.object({
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(7).max(40),
@@ -29,6 +31,66 @@ async function ensureBookingsTable(sql) {
 
 function cleanPhone(phone) {
   return phone.replace(/[^+\d\s()-]/g, "").slice(0, 40);
+}
+
+function isAdminAuthorized(request) {
+  if (!adminKey) return false;
+
+  const requestKey = request.headers.get("x-admin-key");
+  return Boolean(requestKey && requestKey === adminKey);
+}
+
+export async function GET(request) {
+  const sql = getDb();
+  if (!sql) {
+    return NextResponse.json(
+      {
+        error: "Base de datos no configurada"
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!adminKey) {
+    return NextResponse.json(
+      {
+        error: "Falta ADMIN_DASHBOARD_KEY"
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  try {
+    await ensureBookingsTable(sql);
+
+    const rows = await sql`
+      SELECT
+        id,
+        name,
+        phone,
+        service,
+        barber,
+        appointment_date,
+        appointment_time,
+        created_at
+      FROM bookings
+      ORDER BY created_at DESC
+      LIMIT 100;
+    `;
+
+    return NextResponse.json({ ok: true, bookings: rows }, { status: 200 });
+  } catch {
+    return NextResponse.json(
+      {
+        error: "No pudimos cargar las reservas"
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request) {
