@@ -64,3 +64,41 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: "No pudimos actualizar la reserva" }, { status: 500 });
   }
 }
+
+export async function DELETE(request, { params }) {
+  const sql = getDb();
+  if (!sql) {
+    return NextResponse.json({ error: "Base de datos no configurada" }, { status: 503 });
+  }
+
+  if (!isAdminConfigured()) {
+    return NextResponse.json({ error: "Falta ADMIN_DASHBOARD_KEY" }, { status: 503 });
+  }
+
+  if (!isAdminAuthorizedRequest(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const bookingId = parseBookingId(params.bookingId);
+  if (!bookingId) {
+    return NextResponse.json({ error: "ID de reserva invalido" }, { status: 400 });
+  }
+
+  try {
+    await ensureBookingsTable(sql);
+
+    const rows = await sql`
+      DELETE FROM bookings
+      WHERE id = ${bookingId}
+      RETURNING id;
+    `;
+
+    if (!rows[0]) {
+      return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, deletedId: rows[0].id }, { status: 200 });
+  } catch {
+    return NextResponse.json({ error: "No pudimos eliminar la reserva" }, { status: 500 });
+  }
+}

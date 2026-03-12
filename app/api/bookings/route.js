@@ -7,9 +7,10 @@ import {
 } from "../../../lib/admin-auth";
 import {
   ensureBookingsTable,
-  isValidBookingStatus,
   normalizeDateOnly
 } from "../../../lib/bookings-db";
+import { applyBookingsFilters, parseBookingsFilters } from "../../../lib/bookings-filters";
+import { notifyNewBooking } from "../../../lib/booking-notify";
 
 const bookingSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -48,14 +49,9 @@ export async function GET(request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const statusFilter = (searchParams.get("status") || "all").toLowerCase();
-  const fromFilter = normalizeDateOnly(searchParams.get("from"));
-  const toFilter = normalizeDateOnly(searchParams.get("to"));
-  const query = (searchParams.get("q") || "").trim().toLowerCase();
-
-  if (statusFilter !== "all" && !isValidBookingStatus(statusFilter)) {
-    return NextResponse.json({ error: "Filtro de estado invalido" }, { status: 400 });
+  const parsedFilters = parseBookingsFilters(request.url);
+  if (parsedFilters.error) {
+    return NextResponse.json({ error: parsedFilters.error }, { status: 400 });
   }
 
   try {
@@ -79,30 +75,7 @@ export async function GET(request) {
       LIMIT 300;
     `;
 
-    const filtered = rows.filter((row) => {
-      const appointmentDate = normalizeDateOnly(row.appointment_date);
-
-      if (statusFilter !== "all" && row.status !== statusFilter) {
-        return false;
-      }
-
-      if (fromFilter && appointmentDate < fromFilter) {
-        return false;
-      }
-
-      if (toFilter && appointmentDate > toFilter) {
-        return false;
-      }
-
-      if (query) {
-        const haystack = `${row.name} ${row.phone} ${row.service} ${row.barber}`.toLowerCase();
-        if (!haystack.includes(query)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    const filtered = applyBookingsFilters(rows, parsedFilters.filters);
 
     return NextResponse.json({ ok: true, bookings: filtered.slice(0, 100) }, { status: 200 });
   } catch {
@@ -175,6 +148,18 @@ export async function POST(request) {
     `;
 
     const booking = rows[0];
+
+    notifyNewBooking({
+      id: booking.id,
+      status: booking.status,
+      name,
+      phone: cleanPhone(phone),
+      service,
+      barber,
+      date: normalizeDateOnly(date),
+      time
+    });
+
     return NextResponse.json(
       {
         ok: true,

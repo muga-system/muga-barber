@@ -169,6 +169,17 @@ a {
   color: var(--color-primary);
 }
 
+.btn-danger {
+  background: #f9efee;
+  border-color: #d8b0ad;
+  color: #8e2f28;
+}
+
+.btn-danger:hover {
+  background: #f2dddb;
+  border-color: #bf8b86;
+}
+
 .desktop-cta {
   display: none;
 }
@@ -637,6 +648,12 @@ select:focus {
   gap: var(--space-3);
 }
 
+.admin-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .admin-filters {
   display: grid;
   gap: var(--space-3);
@@ -794,6 +811,10 @@ select:focus {
   .admin-toolbar {
     grid-template-columns: 1fr auto;
     align-items: end;
+  }
+
+  .admin-toolbar-actions {
+    justify-content: flex-end;
   }
 
   .split {

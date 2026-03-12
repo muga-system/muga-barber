@@ -5,6 +5,8 @@ Este proyecto ya incluye un endpoint real para guardar reservas en base de datos
 - `POST /api/bookings`
 - `GET /api/bookings` (solo admin autenticado)
 - `PATCH /api/bookings/:id` (actualiza estado)
+- `DELETE /api/bookings/:id` (elimina reserva)
+- `GET /api/bookings/export` (descarga CSV filtrado)
 - `POST /api/admin/session` y `DELETE /api/admin/session` (login/logout admin)
 - Archivo: `app/api/bookings/route.js`
 - Valida datos con `zod` y guarda en Postgres (Neon/Vercel).
@@ -23,6 +25,7 @@ Configura en Vercel (Production):
 - `ADMIN_DASHBOARD_KEY`
 - `NEXT_PUBLIC_SITE_URL`
 - `NEXT_PUBLIC_GA_MEASUREMENT_ID` (opcional, para analytics)
+- `BOOKING_WEBHOOK_URL` (opcional, notificacion interna por webhook)
 
 ## 3) Comportamiento actual
 
@@ -31,6 +34,8 @@ Configura en Vercel (Production):
 - La tabla incluye `status` (`pending`, `confirmed`, `completed`, `cancelled`).
 - Al guardar, el formulario envia a WhatsApp con codigo de reserva.
 - Panel interno de reservas disponible en `/admin/reservas`.
+- El panel permite exportar CSV y eliminar reservas puntuales.
+- Si `BOOKING_WEBHOOK_URL` esta definido, se envia evento `booking.created` en cada reserva nueva.
 
 ## 4) Prueba rapida
 
@@ -45,7 +50,8 @@ Configura en Vercel (Production):
 2. Ingresa `ADMIN_DASHBOARD_KEY` en el login.
 3. Carga el listado de reservas recientes (max 100).
 4. Filtra por estado, fecha o texto.
-5. Actualiza estado de cada reserva desde el panel.
+5. Actualiza estado o elimina reservas desde el panel.
+6. Exporta CSV con los filtros aplicados.
 
 ## 6) Estado actual en produccion
 

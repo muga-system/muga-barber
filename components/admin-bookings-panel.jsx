@@ -35,6 +35,8 @@ export default function AdminBookingsPanel() {
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const [filters, setFilters] = useState({
     q: "",
@@ -209,6 +211,62 @@ export default function AdminBookingsPanel() {
     }
   }
 
+  async function handleDeleteBooking(bookingId) {
+    const confirmed = window.confirm(`Eliminar reserva #${bookingId}? Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setDeletingId(bookingId);
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: "DELETE"
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo eliminar la reserva.");
+      }
+
+      setBookings((current) => current.filter((booking) => String(booking.id) !== String(bookingId)));
+      setStatusText(`Reserva #${bookingId} eliminada.`);
+    } catch (error) {
+      setStatusText(error.message || "No se pudo eliminar la reserva.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleExportCsv() {
+    setExporting(true);
+
+    try {
+      const endpoint = queryString ? `/api/bookings/export?${queryString}` : "/api/bookings/export";
+      const response = await fetch(endpoint, { method: "GET" });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "No se pudo exportar el CSV.");
+      }
+
+      const csv = await response.text();
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reservas-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setStatusText("CSV exportado correctamente.");
+    } catch (error) {
+      setStatusText(error.message || "No se pudo exportar el CSV.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (authState === "checking") {
     return <p className="admin-status">Validando sesion...</p>;
   }
@@ -295,9 +353,19 @@ export default function AdminBookingsPanel() {
           </button>
         </form>
 
-        <button className="btn btn-secondary" type="button" onClick={handleLogout}>
-          Cerrar sesion
-        </button>
+        <div className="admin-toolbar-actions">
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exporting}
+          >
+            {exporting ? "Exportando..." : "Exportar CSV"}
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={handleLogout}>
+            Cerrar sesion
+          </button>
+        </div>
       </div>
 
       <p className="admin-status">{statusText}</p>
@@ -360,10 +428,22 @@ export default function AdminBookingsPanel() {
                         <button
                           className="btn btn-secondary"
                           type="button"
-                          disabled={updatingId === booking.id || draftStatus === booking.status}
+                          disabled={
+                            updatingId === booking.id ||
+                            deletingId === booking.id ||
+                            draftStatus === booking.status
+                          }
                           onClick={() => handleStatusUpdate(booking.id)}
                         >
                           {updatingId === booking.id ? "Guardando..." : "Guardar"}
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          type="button"
+                          disabled={deletingId === booking.id || updatingId === booking.id}
+                          onClick={() => handleDeleteBooking(booking.id)}
+                        >
+                          {deletingId === booking.id ? "Eliminando..." : "Eliminar"}
                         </button>
                       </div>
                     </td>
