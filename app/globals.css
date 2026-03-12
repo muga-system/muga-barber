@@ -720,6 +720,96 @@ select:focus {
   color: var(--color-text-muted);
 }
 
+.admin-weekly {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-weekly-header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-weekly-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(180px, 1fr));
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.admin-week-day {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: #fbfaf7;
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+  min-height: 180px;
+}
+
+.admin-week-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.admin-week-day-head p {
+  margin: 0;
+  text-transform: capitalize;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.admin-week-day-head strong {
+  font-size: 0.85rem;
+}
+
+.admin-week-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.admin-week-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-week-item {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 0.45rem 0.5rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.admin-week-item p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.admin-week-time {
+  color: var(--color-primary) !important;
+  font-weight: 700;
+}
+
 .admin-filters {
   display: grid;
   gap: var(--space-3);

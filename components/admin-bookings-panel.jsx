@@ -46,7 +46,51 @@ function toAppointmentTimestamp(booking) {
   return parsed.getTime();
 }
 
+function parseDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(dateKey, days) {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+function getWeekStart(dateKey) {
+  const date = parseDateKey(dateKey);
+  const day = date.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diffToMonday);
+  return toDateKey(date);
+}
+
+function formatDateKey(dateKey, options) {
+  const date = parseDateKey(dateKey);
+  return date.toLocaleDateString("es-AR", options);
+}
+
+function createQueryString(filters) {
+  const params = new URLSearchParams();
+
+  if (filters.q.trim()) params.set("q", filters.q.trim());
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+
+  return params.toString();
+}
+
 export default function AdminBookingsPanel() {
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+
   const [authState, setAuthState] = useState("checking");
   const [authKey, setAuthKey] = useState("");
   const [statusText, setStatusText] = useState("Validando sesion...");
@@ -64,6 +108,7 @@ export default function AdminBookingsPanel() {
   });
 
   const [statusDrafts, setStatusDrafts] = useState({});
+  const [calendarWeekStart, setCalendarWeekStart] = useState(getWeekStart(todayDateKey));
 
   const sortedBookings = useMemo(
     () => [...bookings].sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b)),
@@ -71,7 +116,6 @@ export default function AdminBookingsPanel() {
   );
 
   const hasBookings = sortedBookings.length > 0;
-  const todayDateKey = new Date().toISOString().slice(0, 10);
 
   const stats = useMemo(() => {
     const base = {
@@ -96,16 +140,42 @@ export default function AdminBookingsPanel() {
     [sortedBookings, todayDateKey]
   );
 
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
+  const queryString = useMemo(() => createQueryString(filters), [filters]);
 
-    if (filters.q.trim()) params.set("q", filters.q.trim());
-    if (filters.status && filters.status !== "all") params.set("status", filters.status);
-    if (filters.from) params.set("from", filters.from);
-    if (filters.to) params.set("to", filters.to);
+  const weekDays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) => {
+        const dateKey = addDays(calendarWeekStart, index);
+        return {
+          dateKey,
+          shortLabel: formatDateKey(dateKey, { weekday: "short" }),
+          dayLabel: formatDateKey(dateKey, { day: "2-digit", month: "2-digit" })
+        };
+      }),
+    [calendarWeekStart]
+  );
 
-    return params.toString();
-  }, [filters]);
+  const weekRangeLabel = useMemo(() => {
+    const weekEnd = addDays(calendarWeekStart, 6);
+    const start = formatDateKey(calendarWeekStart, { day: "2-digit", month: "short" });
+    const end = formatDateKey(weekEnd, { day: "2-digit", month: "short" });
+    return `${start} - ${end}`;
+  }, [calendarWeekStart]);
+
+  const weeklyCalendar = useMemo(() => {
+    const map = new Map(weekDays.map((day) => [day.dateKey, []]));
+
+    sortedBookings.forEach((booking) => {
+      const dateKey = normalizeDateKey(booking.appointment_date);
+      if (!map.has(dateKey)) return;
+      map.get(dateKey).push(booking);
+    });
+
+    return weekDays.map((day) => ({
+      ...day,
+      bookings: map.get(day.dateKey)
+    }));
+  }, [sortedBookings, weekDays]);
 
   useEffect(() => {
     async function verifySession() {
@@ -179,11 +249,14 @@ export default function AdminBookingsPanel() {
     setStatusText("Sesion cerrada.");
   }
 
-  async function loadBookings() {
+  async function loadBookings(overrideFilters) {
+    const effectiveFilters = overrideFilters || filters;
+    const effectiveQuery = createQueryString(effectiveFilters);
+
     setLoadingBookings(true);
 
     try {
-      const endpoint = queryString ? `/api/bookings?${queryString}` : "/api/bookings";
+      const endpoint = effectiveQuery ? `/api/bookings?${effectiveQuery}` : "/api/bookings";
       const response = await fetch(endpoint, { method: "GET" });
       const payload = await response.json().catch(() => ({}));
 
@@ -312,6 +385,21 @@ export default function AdminBookingsPanel() {
     } finally {
       setExporting(false);
     }
+  }
+
+  function shiftCalendarWeek(direction) {
+    setCalendarWeekStart((current) => addDays(current, direction * 7));
+  }
+
+  async function handleApplyWeekFilters() {
+    const nextFilters = {
+      ...filters,
+      from: calendarWeekStart,
+      to: addDays(calendarWeekStart, 6)
+    };
+
+    setFilters(nextFilters);
+    await loadBookings(nextFilters);
   }
 
   if (authState === "checking") {
@@ -491,6 +579,61 @@ export default function AdminBookingsPanel() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="admin-weekly" aria-label="Calendario semanal">
+        <div className="admin-weekly-header">
+          <h2>Calendario semanal</h2>
+          <p className="admin-status">{weekRangeLabel}</p>
+          <div className="admin-weekly-actions">
+            <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarWeek(-1)}>
+              Semana anterior
+            </button>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => setCalendarWeekStart(getWeekStart(todayDateKey))}
+            >
+              Semana actual
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarWeek(1)}>
+              Semana siguiente
+            </button>
+            <button className="btn btn-primary" type="button" onClick={handleApplyWeekFilters}>
+              Cargar esta semana
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-week-grid">
+          {weeklyCalendar.map((day) => (
+            <article key={day.dateKey} className="admin-week-day">
+              <header className="admin-week-day-head">
+                <p>{day.shortLabel}</p>
+                <strong>{day.dayLabel}</strong>
+              </header>
+
+              {day.bookings.length === 0 ? (
+                <p className="admin-week-empty">Sin reservas</p>
+              ) : (
+                <ul className="admin-week-list">
+                  {day.bookings.map((booking) => (
+                    <li key={`week-${day.dateKey}-${booking.id}`} className="admin-week-item">
+                      <p className="admin-week-time">{booking.appointment_time}</p>
+                      <strong>{booking.name}</strong>
+                      <p>
+                        {booking.service} · {booking.barber}
+                      </p>
+                      <span className={`status-pill status-${booking.status || "pending"}`}>
+                        {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="admin-table-wrap">
