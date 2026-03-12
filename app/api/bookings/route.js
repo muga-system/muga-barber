@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "../../../lib/db";
-
-const adminKey = process.env.ADMIN_DASHBOARD_KEY;
+import {
+  isAdminAuthorizedRequest,
+  isAdminConfigured
+} from "../../../lib/admin-auth";
+import {
+  ensureBookingsTable,
+  isValidBookingStatus,
+  normalizeDateOnly
+} from "../../../lib/bookings-db";
 
 const bookingSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -13,31 +20,8 @@ const bookingSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/)
 });
 
-async function ensureBookingsTable(sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS bookings (
-      id BIGSERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      service TEXT NOT NULL,
-      barber TEXT NOT NULL,
-      appointment_date DATE NOT NULL,
-      appointment_time VARCHAR(5) NOT NULL,
-      source VARCHAR(20) NOT NULL DEFAULT 'web',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `;
-}
-
 function cleanPhone(phone) {
   return phone.replace(/[^+\d\s()-]/g, "").slice(0, 40);
-}
-
-function isAdminAuthorized(request) {
-  if (!adminKey) return false;
-
-  const requestKey = request.headers.get("x-admin-key");
-  return Boolean(requestKey && requestKey === adminKey);
 }
 
 export async function GET(request) {
@@ -51,7 +35,7 @@ export async function GET(request) {
     );
   }
 
-  if (!adminKey) {
+  if (!isAdminConfigured()) {
     return NextResponse.json(
       {
         error: "Falta ADMIN_DASHBOARD_KEY"
@@ -60,8 +44,18 @@ export async function GET(request) {
     );
   }
 
-  if (!isAdminAuthorized(request)) {
+  if (!isAdminAuthorizedRequest(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const statusFilter = (searchParams.get("status") || "all").toLowerCase();
+  const fromFilter = normalizeDateOnly(searchParams.get("from"));
+  const toFilter = normalizeDateOnly(searchParams.get("to"));
+  const query = (searchParams.get("q") || "").trim().toLowerCase();
+
+  if (statusFilter !== "all" && !isValidBookingStatus(statusFilter)) {
+    return NextResponse.json({ error: "Filtro de estado invalido" }, { status: 400 });
   }
 
   try {
@@ -76,13 +70,41 @@ export async function GET(request) {
         barber,
         appointment_date,
         appointment_time,
+        status,
+        source,
+        updated_at,
         created_at
       FROM bookings
       ORDER BY created_at DESC
-      LIMIT 100;
+      LIMIT 300;
     `;
 
-    return NextResponse.json({ ok: true, bookings: rows }, { status: 200 });
+    const filtered = rows.filter((row) => {
+      const appointmentDate = normalizeDateOnly(row.appointment_date);
+
+      if (statusFilter !== "all" && row.status !== statusFilter) {
+        return false;
+      }
+
+      if (fromFilter && appointmentDate < fromFilter) {
+        return false;
+      }
+
+      if (toFilter && appointmentDate > toFilter) {
+        return false;
+      }
+
+      if (query) {
+        const haystack = `${row.name} ${row.phone} ${row.service} ${row.barber}`.toLowerCase();
+        if (!haystack.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return NextResponse.json({ ok: true, bookings: filtered.slice(0, 100) }, { status: 200 });
   } catch {
     return NextResponse.json(
       {
@@ -136,6 +158,7 @@ export async function POST(request) {
         barber,
         appointment_date,
         appointment_time,
+        status,
         source
       )
       VALUES (
@@ -145,9 +168,10 @@ export async function POST(request) {
         ${barber},
         ${date},
         ${time},
+        'pending',
         'web'
       )
-      RETURNING id, created_at;
+      RETURNING id, status, created_at;
     `;
 
     const booking = rows[0];
@@ -155,6 +179,7 @@ export async function POST(request) {
       {
         ok: true,
         bookingId: booking.id,
+        status: booking.status,
         createdAt: booking.created_at
       },
       { status: 201 }

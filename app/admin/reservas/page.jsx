@@ -19,8 +19,8 @@ export default function AdminReservasPage() {
         <p className="eyebrow">Interno</p>
         <h1>Panel de reservas</h1>
         <p className="content-lead">
-          Esta vista es operativa para el equipo. No compartir el enlace ni la
-          clave de administrador.
+          Esta vista es operativa para el equipo. Requiere iniciar sesion con
+          clave de administrador y permite filtrar y actualizar estados.
         </p>
 
         <AdminBookingsPanel />

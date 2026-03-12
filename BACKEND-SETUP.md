@@ -3,7 +3,9 @@
 Este proyecto ya incluye un endpoint real para guardar reservas en base de datos:
 
 - `POST /api/bookings`
-- `GET /api/bookings` (solo admin con `x-admin-key`)
+- `GET /api/bookings` (solo admin autenticado)
+- `PATCH /api/bookings/:id` (actualiza estado)
+- `POST /api/admin/session` y `DELETE /api/admin/session` (login/logout admin)
 - Archivo: `app/api/bookings/route.js`
 - Valida datos con `zod` y guarda en Postgres (Neon/Vercel).
 
@@ -26,6 +28,7 @@ Configura en Vercel (Production):
 
 - Si `POSTGRES_URL` no existe, el endpoint responde `503`.
 - Si existe, la tabla `bookings` se crea automaticamente en el primer insert.
+- La tabla incluye `status` (`pending`, `confirmed`, `completed`, `cancelled`).
 - Al guardar, el formulario envia a WhatsApp con codigo de reserva.
 - Panel interno de reservas disponible en `/admin/reservas`.
 
@@ -39,8 +42,10 @@ Configura en Vercel (Production):
 ## 5) Panel interno de reservas
 
 1. Abre `/admin/reservas`.
-2. Ingresa `ADMIN_DASHBOARD_KEY`.
+2. Ingresa `ADMIN_DASHBOARD_KEY` en el login.
 3. Carga el listado de reservas recientes (max 100).
+4. Filtra por estado, fecha o texto.
+5. Actualiza estado de cada reserva desde el panel.
 
 ## 6) Estado actual en produccion
 

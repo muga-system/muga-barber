@@ -632,6 +632,22 @@ select:focus {
   gap: var(--space-4);
 }
 
+.admin-toolbar {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-filters {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.admin-inline-field {
+  min-width: 0;
+}
+
 .admin-form {
   display: flex;
   flex-wrap: wrap;
@@ -641,6 +657,47 @@ select:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+}
+
+.admin-action {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-strong);
+}
+
+.status-pending {
+  color: #7a5c2a;
+  border-color: #d5c08f;
+  background: #fbf5e8;
+}
+
+.status-confirmed {
+  color: #1f5f41;
+  border-color: #9ccbb2;
+  background: #edf8f1;
+}
+
+.status-completed {
+  color: #1c4d71;
+  border-color: #a3bfd5;
+  background: #edf5fb;
+}
+
+.status-cancelled {
+  color: #8e2f28;
+  border-color: #deaca8;
+  background: #fcefed;
 }
 
 .admin-form label {
@@ -663,7 +720,7 @@ select:focus {
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 880px;
+  min-width: 1040px;
 }
 
 .admin-table th,
@@ -732,6 +789,11 @@ select:focus {
     grid-template-columns: 1.5fr 0.6fr 0.5fr;
     align-items: center;
     column-gap: var(--space-4);
+  }
+
+  .admin-toolbar {
+    grid-template-columns: 1fr auto;
+    align-items: end;
   }
 
   .split {
