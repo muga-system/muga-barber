@@ -734,6 +734,12 @@ select:focus {
   gap: var(--space-2);
 }
 
+.admin-week-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .admin-weekly-actions {
   display: flex;
   flex-wrap: wrap;
@@ -808,6 +814,71 @@ select:focus {
 .admin-week-time {
   color: var(--color-primary) !important;
   font-weight: 700;
+}
+
+.admin-week-barber-rows {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-week-barber-row {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: #fbfaf7;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-week-barber-head h3 {
+  font-size: 1rem;
+}
+
+.admin-week-barber-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.admin-week-barber-day {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+  min-height: 132px;
+}
+
+.admin-week-barber-day-label {
+  margin: 0;
+  text-transform: capitalize;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.admin-week-barber-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-week-barber-item {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 0.4rem 0.45rem;
+  display: grid;
+  gap: 0.14rem;
+}
+
+.admin-week-barber-item p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
 }
 
 .admin-filters {

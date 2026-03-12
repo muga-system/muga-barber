@@ -109,6 +109,7 @@ export default function AdminBookingsPanel() {
 
   const [statusDrafts, setStatusDrafts] = useState({});
   const [calendarWeekStart, setCalendarWeekStart] = useState(getWeekStart(todayDateKey));
+  const [weeklyViewMode, setWeeklyViewMode] = useState("days");
 
   const sortedBookings = useMemo(
     () => [...bookings].sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b)),
@@ -176,6 +177,35 @@ export default function AdminBookingsPanel() {
       bookings: map.get(day.dateKey)
     }));
   }, [sortedBookings, weekDays]);
+
+  const weeklyByBarber = useMemo(() => {
+    const barberMap = new Map();
+
+    weeklyCalendar.forEach((day) => {
+      day.bookings.forEach((booking) => {
+        const barberName = booking.barber || "Sin barbero";
+
+        if (!barberMap.has(barberName)) {
+          barberMap.set(
+            barberName,
+            new Map(weekDays.map((weekDay) => [weekDay.dateKey, []]))
+          );
+        }
+
+        barberMap.get(barberName).get(day.dateKey).push(booking);
+      });
+    });
+
+    return Array.from(barberMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([barber, daysMap]) => ({
+        barber,
+        days: weekDays.map((weekDay) => ({
+          ...weekDay,
+          bookings: daysMap.get(weekDay.dateKey) || []
+        }))
+      }));
+  }, [weeklyCalendar, weekDays]);
 
   useEffect(() => {
     async function verifySession() {
@@ -585,6 +615,22 @@ export default function AdminBookingsPanel() {
         <div className="admin-weekly-header">
           <h2>Calendario semanal</h2>
           <p className="admin-status">{weekRangeLabel}</p>
+          <div className="admin-week-view-toggle">
+            <button
+              className={`btn ${weeklyViewMode === "days" ? "btn-primary" : "btn-secondary"}`}
+              type="button"
+              onClick={() => setWeeklyViewMode("days")}
+            >
+              Vista por dia
+            </button>
+            <button
+              className={`btn ${weeklyViewMode === "barber" ? "btn-primary" : "btn-secondary"}`}
+              type="button"
+              onClick={() => setWeeklyViewMode("barber")}
+            >
+              Vista por barbero
+            </button>
+          </div>
           <div className="admin-weekly-actions">
             <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarWeek(-1)}>
               Semana anterior
@@ -605,35 +651,76 @@ export default function AdminBookingsPanel() {
           </div>
         </div>
 
-        <div className="admin-week-grid">
-          {weeklyCalendar.map((day) => (
-            <article key={day.dateKey} className="admin-week-day">
-              <header className="admin-week-day-head">
-                <p>{day.shortLabel}</p>
-                <strong>{day.dayLabel}</strong>
-              </header>
+        {weeklyViewMode === "days" ? (
+          <div className="admin-week-grid">
+            {weeklyCalendar.map((day) => (
+              <article key={day.dateKey} className="admin-week-day">
+                <header className="admin-week-day-head">
+                  <p>{day.shortLabel}</p>
+                  <strong>{day.dayLabel}</strong>
+                </header>
 
-              {day.bookings.length === 0 ? (
-                <p className="admin-week-empty">Sin reservas</p>
-              ) : (
-                <ul className="admin-week-list">
-                  {day.bookings.map((booking) => (
-                    <li key={`week-${day.dateKey}-${booking.id}`} className="admin-week-item">
-                      <p className="admin-week-time">{booking.appointment_time}</p>
-                      <strong>{booking.name}</strong>
-                      <p>
-                        {booking.service} · {booking.barber}
+                {day.bookings.length === 0 ? (
+                  <p className="admin-week-empty">Sin reservas</p>
+                ) : (
+                  <ul className="admin-week-list">
+                    {day.bookings.map((booking) => (
+                      <li key={`week-${day.dateKey}-${booking.id}`} className="admin-week-item">
+                        <p className="admin-week-time">{booking.appointment_time}</p>
+                        <strong>{booking.name}</strong>
+                        <p>
+                          {booking.service} · {booking.barber}
+                        </p>
+                        <span className={`status-pill status-${booking.status || "pending"}`}>
+                          {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : weeklyByBarber.length === 0 ? (
+          <p className="admin-week-empty">No hay reservas en esta semana.</p>
+        ) : (
+          <div className="admin-week-barber-rows">
+            {weeklyByBarber.map((barberGroup) => (
+              <article key={barberGroup.barber} className="admin-week-barber-row">
+                <header className="admin-week-barber-head">
+                  <h3>{barberGroup.barber}</h3>
+                </header>
+
+                <div className="admin-week-barber-grid">
+                  {barberGroup.days.map((day) => (
+                    <section key={`${barberGroup.barber}-${day.dateKey}`} className="admin-week-barber-day">
+                      <p className="admin-week-barber-day-label">
+                        {day.shortLabel} {day.dayLabel}
                       </p>
-                      <span className={`status-pill status-${booking.status || "pending"}`}>
-                        {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                      </span>
-                    </li>
+
+                      {day.bookings.length === 0 ? (
+                        <p className="admin-week-empty">Sin reservas</p>
+                      ) : (
+                        <ul className="admin-week-barber-list">
+                          {day.bookings.map((booking) => (
+                            <li key={`barber-week-${booking.id}-${day.dateKey}`} className="admin-week-barber-item">
+                              <p className="admin-week-time">{booking.appointment_time}</p>
+                              <strong>{booking.name}</strong>
+                              <p>{booking.service}</p>
+                              <span className={`status-pill status-${booking.status || "pending"}`}>
+                                {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
                   ))}
-                </ul>
-              )}
-            </article>
-          ))}
-        </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="admin-table-wrap">
