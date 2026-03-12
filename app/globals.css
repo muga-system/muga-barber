@@ -746,6 +746,39 @@ select:focus {
   gap: var(--space-2);
 }
 
+.admin-drop-statuses {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-drop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--space-2);
+}
+
+.admin-drop-zone {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  min-height: 56px;
+  padding: 0.45rem 0.6rem;
+  display: grid;
+  place-items: center;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+
+.admin-drop-zone strong {
+  font-size: 0.85rem;
+}
+
+.admin-drop-zone.is-over {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: #f5f2ed;
+  transform: translateY(-1px);
+}
+
 .admin-week-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(180px, 1fr));
@@ -803,6 +836,11 @@ select:focus {
   padding: 0.45rem 0.5rem;
   display: grid;
   gap: 0.15rem;
+  cursor: grab;
+}
+
+.admin-week-item.is-dragging {
+  opacity: 0.6;
 }
 
 .admin-week-item p {
@@ -873,6 +911,11 @@ select:focus {
   padding: 0.4rem 0.45rem;
   display: grid;
   gap: 0.14rem;
+  cursor: grab;
+}
+
+.admin-week-barber-item.is-dragging {
+  opacity: 0.6;
 }
 
 .admin-week-barber-item p {

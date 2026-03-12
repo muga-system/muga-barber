@@ -99,6 +99,8 @@ export default function AdminBookingsPanel() {
   const [updatingId, setUpdatingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [draggingBooking, setDraggingBooking] = useState(null);
+  const [dragTargetStatus, setDragTargetStatus] = useState(null);
 
   const [filters, setFilters] = useState({
     q: "",
@@ -304,6 +306,8 @@ export default function AdminBookingsPanel() {
 
       const nextBookings = payload.bookings || [];
       setBookings(nextBookings);
+      setDraggingBooking(null);
+      setDragTargetStatus(null);
 
       const draftMap = {};
       nextBookings.forEach((booking) => {
@@ -321,8 +325,7 @@ export default function AdminBookingsPanel() {
     }
   }
 
-  async function handleStatusUpdate(bookingId) {
-    const nextStatus = statusDrafts[bookingId];
+  async function updateBookingStatus(bookingId, nextStatus, source = "panel") {
     if (!nextStatus) return;
 
     setUpdatingId(bookingId);
@@ -353,12 +356,27 @@ export default function AdminBookingsPanel() {
         )
       );
 
-      setStatusText(`Reserva #${bookingId} actualizada a ${BOOKING_STATUS_LABELS[nextStatus]}.`);
+      setStatusDrafts((current) => ({
+        ...current,
+        [bookingId]: payload.booking.status
+      }));
+
+      const statusLabel = BOOKING_STATUS_LABELS[payload.booking.status] || payload.booking.status;
+      setStatusText(
+        source === "drag"
+          ? `Turno #${bookingId} movido a ${statusLabel}.`
+          : `Reserva #${bookingId} actualizada a ${statusLabel}.`
+      );
     } catch (error) {
       setStatusText(error.message || "No se pudo actualizar el estado.");
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  async function handleStatusUpdate(bookingId) {
+    const nextStatus = statusDrafts[bookingId];
+    await updateBookingStatus(bookingId, nextStatus, "panel");
   }
 
   async function handleDeleteBooking(bookingId) {
@@ -378,6 +396,11 @@ export default function AdminBookingsPanel() {
       }
 
       setBookings((current) => current.filter((booking) => String(booking.id) !== String(bookingId)));
+      setStatusDrafts((current) => {
+        const next = { ...current };
+        delete next[bookingId];
+        return next;
+      });
       setStatusText(`Reserva #${bookingId} eliminada.`);
     } catch (error) {
       setStatusText(error.message || "No se pudo eliminar la reserva.");
@@ -430,6 +453,60 @@ export default function AdminBookingsPanel() {
 
     setFilters(nextFilters);
     await loadBookings(nextFilters);
+  }
+
+  function handleDragStart(event, booking) {
+    if (!booking?.id) return;
+
+    setDraggingBooking({
+      id: booking.id,
+      status: booking.status || "pending"
+    });
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(booking.id));
+    }
+  }
+
+  function handleDragEnd() {
+    setDraggingBooking(null);
+    setDragTargetStatus(null);
+  }
+
+  function handleStatusDragOver(event, targetStatus) {
+    if (!draggingBooking || draggingBooking.status === targetStatus) {
+      return;
+    }
+
+    event.preventDefault();
+    setDragTargetStatus(targetStatus);
+  }
+
+  function handleStatusDragLeave(targetStatus) {
+    if (dragTargetStatus === targetStatus) {
+      setDragTargetStatus(null);
+    }
+  }
+
+  async function handleStatusDrop(event, targetStatus) {
+    event.preventDefault();
+
+    if (!draggingBooking) {
+      setDragTargetStatus(null);
+      return;
+    }
+
+    if (draggingBooking.status === targetStatus) {
+      setStatusText("El turno ya tiene ese estado.");
+      setDraggingBooking(null);
+      setDragTargetStatus(null);
+      return;
+    }
+
+    await updateBookingStatus(draggingBooking.id, targetStatus, "drag");
+    setDraggingBooking(null);
+    setDragTargetStatus(null);
   }
 
   if (authState === "checking") {
@@ -649,6 +726,23 @@ export default function AdminBookingsPanel() {
               Cargar esta semana
             </button>
           </div>
+
+          <div className="admin-drop-statuses" aria-label="Cambiar estado por arrastre">
+            <p className="admin-status">Arrastra un turno para cambiar estado rapido:</p>
+            <div className="admin-drop-grid">
+              {BOOKING_STATUSES.map((status) => (
+                <div
+                  key={`drop-${status}`}
+                  className={`admin-drop-zone status-${status}${dragTargetStatus === status ? " is-over" : ""}`}
+                  onDragOver={(event) => handleStatusDragOver(event, status)}
+                  onDragLeave={() => handleStatusDragLeave(status)}
+                  onDrop={(event) => handleStatusDrop(event, status)}
+                >
+                  <strong>{BOOKING_STATUS_LABELS[status]}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {weeklyViewMode === "days" ? (
@@ -665,10 +759,16 @@ export default function AdminBookingsPanel() {
                 ) : (
                   <ul className="admin-week-list">
                     {day.bookings.map((booking) => (
-                      <li key={`week-${day.dateKey}-${booking.id}`} className="admin-week-item">
-                        <p className="admin-week-time">{booking.appointment_time}</p>
-                        <strong>{booking.name}</strong>
-                        <p>
+                    <li
+                      key={`week-${day.dateKey}-${booking.id}`}
+                      className={`admin-week-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                      draggable={updatingId !== booking.id && deletingId !== booking.id}
+                      onDragStart={(event) => handleDragStart(event, booking)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <p className="admin-week-time">{booking.appointment_time}</p>
+                      <strong>{booking.name}</strong>
+                      <p>
                           {booking.service} · {booking.barber}
                         </p>
                         <span className={`status-pill status-${booking.status || "pending"}`}>
@@ -703,7 +803,13 @@ export default function AdminBookingsPanel() {
                       ) : (
                         <ul className="admin-week-barber-list">
                           {day.bookings.map((booking) => (
-                            <li key={`barber-week-${booking.id}-${day.dateKey}`} className="admin-week-barber-item">
+                            <li
+                              key={`barber-week-${booking.id}-${day.dateKey}`}
+                              className={`admin-week-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                              draggable={updatingId !== booking.id && deletingId !== booking.id}
+                              onDragStart={(event) => handleDragStart(event, booking)}
+                              onDragEnd={handleDragEnd}
+                            >
                               <p className="admin-week-time">{booking.appointment_time}</p>
                               <strong>{booking.name}</strong>
                               <p>{booking.service}</p>
