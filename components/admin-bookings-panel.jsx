@@ -88,6 +88,37 @@ function createQueryString(filters) {
   return params.toString();
 }
 
+function parseMonthKey(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1, 12, 0, 0);
+}
+
+function toMonthKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function addMonths(monthKey, amount) {
+  const date = parseMonthKey(monthKey);
+  date.setMonth(date.getMonth() + amount);
+  return toMonthKey(date);
+}
+
+function getMonthRange(monthKey) {
+  const monthStart = parseMonthKey(monthKey);
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 12, 0, 0);
+
+  return {
+    from: toDateKey(monthStart),
+    to: toDateKey(monthEnd)
+  };
+}
+
+function getMonthCalendarStart(monthKey) {
+  return getWeekStart(`${monthKey}-01`);
+}
+
 function getStatusLabel(status) {
   return BOOKING_STATUS_LABELS[status] || status;
 }
@@ -117,6 +148,7 @@ export default function AdminBookingsPanel() {
 
   const [statusDrafts, setStatusDrafts] = useState({});
   const [calendarWeekStart, setCalendarWeekStart] = useState(getWeekStart(todayDateKey));
+  const [calendarMonth, setCalendarMonth] = useState(todayDateKey.slice(0, 7));
   const [weeklyViewMode, setWeeklyViewMode] = useState("days");
 
   useEffect(
@@ -132,6 +164,23 @@ export default function AdminBookingsPanel() {
     () => [...bookings].sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b)),
     [bookings]
   );
+
+  const bookingsByDate = useMemo(() => {
+    const map = new Map();
+
+    sortedBookings.forEach((booking) => {
+      const dateKey = normalizeDateKey(booking.appointment_date);
+      if (!dateKey) return;
+
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+
+      map.get(dateKey).push(booking);
+    });
+
+    return map;
+  }, [sortedBookings]);
 
   const hasBookings = sortedBookings.length > 0;
 
@@ -181,19 +230,39 @@ export default function AdminBookingsPanel() {
   }, [calendarWeekStart]);
 
   const weeklyCalendar = useMemo(() => {
-    const map = new Map(weekDays.map((day) => [day.dateKey, []]));
-
-    sortedBookings.forEach((booking) => {
-      const dateKey = normalizeDateKey(booking.appointment_date);
-      if (!map.has(dateKey)) return;
-      map.get(dateKey).push(booking);
-    });
-
     return weekDays.map((day) => ({
       ...day,
-      bookings: map.get(day.dateKey)
+      bookings: bookingsByDate.get(day.dateKey) || []
     }));
-  }, [sortedBookings, weekDays]);
+  }, [bookingsByDate, weekDays]);
+
+  const monthRange = useMemo(() => getMonthRange(calendarMonth), [calendarMonth]);
+
+  const monthRangeLabel = useMemo(() => {
+    const labelDate = parseMonthKey(calendarMonth);
+    const label = labelDate.toLocaleDateString("es-AR", {
+      month: "long",
+      year: "numeric"
+    });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }, [calendarMonth]);
+
+  const monthlyCalendar = useMemo(() => {
+    const startDateKey = getMonthCalendarStart(calendarMonth);
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const dateKey = addDays(startDateKey, index);
+
+      return {
+        dateKey,
+        inCurrentMonth: dateKey.slice(0, 7) === calendarMonth,
+        isToday: dateKey === todayDateKey,
+        shortLabel: formatDateKey(dateKey, { day: "2-digit" }),
+        weekDayLabel: formatDateKey(dateKey, { weekday: "short" }),
+        bookings: bookingsByDate.get(dateKey) || []
+      };
+    });
+  }, [bookingsByDate, calendarMonth, todayDateKey]);
 
   const weeklyByBarber = useMemo(() => {
     const barberMap = new Map();
@@ -504,11 +573,26 @@ export default function AdminBookingsPanel() {
     setCalendarWeekStart((current) => addDays(current, direction * 7));
   }
 
+  function shiftCalendarMonth(direction) {
+    setCalendarMonth((current) => addMonths(current, direction));
+  }
+
   async function handleApplyWeekFilters() {
     const nextFilters = {
       ...filters,
       from: calendarWeekStart,
       to: addDays(calendarWeekStart, 6)
+    };
+
+    setFilters(nextFilters);
+    await loadBookings(nextFilters);
+  }
+
+  async function handleApplyMonthFilters() {
+    const nextFilters = {
+      ...filters,
+      from: monthRange.from,
+      to: monthRange.to
     };
 
     setFilters(nextFilters);
@@ -526,6 +610,8 @@ export default function AdminBookingsPanel() {
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", String(booking.id));
+      event.dataTransfer.setData("application/x-booking-id", String(booking.id));
+      event.dataTransfer.setData("application/x-booking-status", booking.status || "pending");
     }
   }
 
@@ -535,7 +621,15 @@ export default function AdminBookingsPanel() {
   }
 
   function handleStatusDragOver(event, targetStatus) {
-    if (!draggingBooking || draggingBooking.status === targetStatus) {
+    const bookingIdFromTransfer = event.dataTransfer?.getData("application/x-booking-id");
+    const bookingStatusFromTransfer = event.dataTransfer?.getData("application/x-booking-status");
+    const effectiveStatus = draggingBooking?.status || bookingStatusFromTransfer;
+
+    if (!draggingBooking && !bookingIdFromTransfer) {
+      return;
+    }
+
+    if (effectiveStatus && effectiveStatus === targetStatus) {
       return;
     }
 
@@ -552,20 +646,30 @@ export default function AdminBookingsPanel() {
   async function handleStatusDrop(event, targetStatus) {
     event.preventDefault();
 
-    if (!draggingBooking) {
+    const bookingIdFromTransfer = event.dataTransfer?.getData("application/x-booking-id");
+    const bookingId = draggingBooking?.id || bookingIdFromTransfer;
+
+    if (!bookingId) {
       setDragTargetStatus(null);
       return;
     }
 
-    if (draggingBooking.status === targetStatus) {
+    const currentBooking = bookings.find((booking) => String(booking.id) === String(bookingId));
+    if (!currentBooking) {
+      setDragTargetStatus(null);
+      setDraggingBooking(null);
+      return;
+    }
+
+    if ((currentBooking.status || "pending") === targetStatus) {
       setStatusText("El turno ya tiene ese estado.");
       setDraggingBooking(null);
       setDragTargetStatus(null);
       return;
     }
 
-    await updateBookingStatus(draggingBooking.id, targetStatus, "drag", {
-      fromStatus: draggingBooking.status
+    await updateBookingStatus(bookingId, targetStatus, "drag", {
+      fromStatus: currentBooking.status || "pending"
     });
     setDraggingBooking(null);
     setDragTargetStatus(null);
@@ -905,6 +1009,75 @@ export default function AdminBookingsPanel() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="admin-monthly" aria-label="Calendario mensual">
+        <div className="admin-monthly-header">
+          <h2>Calendario mensual</h2>
+          <p className="admin-status">{monthRangeLabel}</p>
+
+          <div className="admin-monthly-actions">
+            <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarMonth(-1)}>
+              Mes anterior
+            </button>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => setCalendarMonth(todayDateKey.slice(0, 7))}
+            >
+              Mes actual
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarMonth(1)}>
+              Mes siguiente
+            </button>
+            <button className="btn btn-primary" type="button" onClick={handleApplyMonthFilters}>
+              Cargar este mes
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-month-grid">
+          {monthlyCalendar.map((day) => (
+            <article
+              key={`month-${day.dateKey}`}
+              className={`admin-month-day${day.inCurrentMonth ? "" : " is-outside"}${day.isToday ? " is-today" : ""}`}
+            >
+              <header className="admin-month-day-head">
+                <p>{day.weekDayLabel}</p>
+                <strong>{day.shortLabel}</strong>
+              </header>
+
+              {day.bookings.length === 0 ? (
+                <p className="admin-week-empty">Sin reservas</p>
+              ) : (
+                <ul className="admin-month-list">
+                  {day.bookings.slice(0, 6).map((booking) => (
+                    <li
+                      key={`month-booking-${day.dateKey}-${booking.id}`}
+                      className={`admin-month-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                      draggable={updatingId !== booking.id && deletingId !== booking.id}
+                      onDragStart={(event) => handleDragStart(event, booking)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <p className="admin-week-time">{booking.appointment_time}</p>
+                      <strong>{booking.name}</strong>
+                      <p>
+                        {booking.service} · {booking.barber}
+                      </p>
+                      <span className={`status-pill status-${booking.status || "pending"}`}>
+                        {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {day.bookings.length > 6 ? (
+                <p className="admin-month-more">+{day.bookings.length - 6} turnos</p>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="admin-table-wrap">

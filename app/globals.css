@@ -833,10 +833,11 @@ select:focus {
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
-  padding: 0.45rem 0.5rem;
+  padding: 0.55rem 0.6rem;
   display: grid;
-  gap: 0.15rem;
+  gap: 0.25rem;
   cursor: grab;
+  min-width: 0;
 }
 
 .admin-week-item.is-dragging {
@@ -847,6 +848,11 @@ select:focus {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-week-item strong {
+  overflow-wrap: anywhere;
 }
 
 .admin-week-time {
@@ -908,10 +914,11 @@ select:focus {
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-sm);
   background: #fff;
-  padding: 0.4rem 0.45rem;
+  padding: 0.5rem;
   display: grid;
-  gap: 0.14rem;
+  gap: 0.25rem;
   cursor: grab;
+  min-width: 0;
 }
 
 .admin-week-barber-item.is-dragging {
@@ -919,6 +926,115 @@ select:focus {
 }
 
 .admin-week-barber-item p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-week-barber-item strong {
+  overflow-wrap: anywhere;
+}
+
+.admin-monthly {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-monthly-header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-monthly-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(170px, 1fr));
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.admin-month-day {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: #fbfaf7;
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+  min-height: 190px;
+}
+
+.admin-month-day.is-outside {
+  opacity: 0.6;
+}
+
+.admin-month-day.is-today {
+  border-color: var(--color-primary);
+}
+
+.admin-month-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.admin-month-day-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.admin-month-day-head strong {
+  font-size: 0.85rem;
+}
+
+.admin-month-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-month-item {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 0.5rem;
+  display: grid;
+  gap: 0.22rem;
+  cursor: grab;
+  min-width: 0;
+}
+
+.admin-month-item p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-month-item strong {
+  overflow-wrap: anywhere;
+}
+
+.admin-month-item.is-dragging {
+  opacity: 0.6;
+}
+
+.admin-month-more {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.8rem;
@@ -947,9 +1063,17 @@ select:focus {
 }
 
 .admin-action {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
   gap: var(--space-2);
   align-items: center;
+  min-width: 330px;
+}
+
+.admin-action .btn {
+  min-height: 38px;
+  padding: 0.5rem 0.7rem;
+  white-space: nowrap;
 }
 
 .status-pill {
@@ -1039,11 +1163,14 @@ select:focus {
   text-align: left;
   border-bottom: 1px solid var(--color-border-soft);
   font-size: 0.9rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .admin-table th {
   background: var(--color-surface-strong);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .pricing-meta {
