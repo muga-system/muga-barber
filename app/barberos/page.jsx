@@ -30,7 +30,7 @@ const BARBERS = [
 
 export default function BarberosPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Equipo</p>
         <h1>Profesionales para resultados consistentes en cada visita</h1>

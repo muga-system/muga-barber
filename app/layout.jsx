@@ -49,6 +49,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body className={`${fontBody.variable} ${fontDisplay.variable}`}>
+        <a className="skip-link" href="#contenido-principal">
+          Ir al contenido principal
+        </a>
         <AnalyticsLoader />
         <TrackingEvents />
         {children}

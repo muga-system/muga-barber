@@ -80,7 +80,7 @@ export default function BookingForm({ whatsappNumber }) {
     }
 
     setIsSubmitting(true);
-    setNotice("Guardando tu reserva...");
+    setNotice("Guardando tu reserva…");
 
     try {
       const response = await fetch("/api/bookings", {
@@ -142,7 +142,7 @@ export default function BookingForm({ whatsappNumber }) {
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          placeholder="+54 9 ..."
+          placeholder="+54 9 11 1234 5678…"
           value={formData.phone}
           onChange={handleFieldChange}
           required
@@ -200,7 +200,7 @@ export default function BookingForm({ whatsappNumber }) {
       </div>
 
       <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Guardando..." : "Reservar turno"}
+        {isSubmitting ? "Guardando…" : "Reservar turno"}
       </button>
       <p className="form-privacy">Tus datos se usan solo para confirmar tu turno.</p>
       <p className="form-note" role="status" aria-live="polite">

@@ -13,7 +13,7 @@ const WHATSAPP_NUMBER = "5491112345678";
 
 export default function ReservarPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Reserva online</p>
         <h1>Elige tu servicio y asegura tu horario</h1>

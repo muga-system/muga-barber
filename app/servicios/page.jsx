@@ -27,7 +27,7 @@ const SERVICES = [
 
 export default function ServiciosPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Servicios</p>
         <h1>Tratamientos disenados para una imagen impecable</h1>

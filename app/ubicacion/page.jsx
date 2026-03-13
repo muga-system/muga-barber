@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function UbicacionPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Ubicacion</p>
         <h1>Estamos en el centro para que reserves y llegues sin rodeos</h1>

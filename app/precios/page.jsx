@@ -30,7 +30,7 @@ const PRICE_TABLE = [
 
 export default function PreciosPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Precios</p>
         <h1>Valores claros para decidir tu reserva sin dudas</h1>

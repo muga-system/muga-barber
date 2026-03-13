@@ -14,7 +14,7 @@ export const metadata = {
 
 export default function AdminReservasPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">Interno</p>
         <h1>Panel de reservas</h1>

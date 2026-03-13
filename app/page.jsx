@@ -115,8 +115,8 @@ export default function HomePage() {
         </a>
       </header>
 
-      <main id="inicio">
-        <section className="hero">
+      <main id="contenido-principal">
+        <section id="inicio" className="hero">
           <div className="hero-copy-wrap">
             <p className="eyebrow">Barberia premium urbana</p>
             <h1>Reserva tu turno online y llega con todo resuelto</h1>

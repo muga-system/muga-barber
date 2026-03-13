@@ -128,7 +128,7 @@ export default function AdminBookingsPanel() {
 
   const [authState, setAuthState] = useState("checking");
   const [authKey, setAuthKey] = useState("");
-  const [statusText, setStatusText] = useState("Validando sesion...");
+  const [statusText, setStatusText] = useState("Validando sesion…");
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
@@ -156,6 +156,7 @@ export default function AdminBookingsPanel() {
       if (undoTimerRef.current) {
         clearTimeout(undoTimerRef.current);
       }
+      document.body.classList.remove("is-dragging");
     },
     []
   );
@@ -307,7 +308,7 @@ export default function AdminBookingsPanel() {
 
         if (payload.authenticated) {
           setAuthState("authenticated");
-          setStatusText("Sesion iniciada. Cargando reservas...");
+          setStatusText("Sesion iniciada. Cargando reservas…");
           await loadBookings();
           return;
         }
@@ -331,7 +332,7 @@ export default function AdminBookingsPanel() {
       return;
     }
 
-    setStatusText("Validando clave...");
+    setStatusText("Validando clave…");
 
     try {
       const response = await fetch("/api/admin/session", {
@@ -349,7 +350,7 @@ export default function AdminBookingsPanel() {
 
       setAuthState("authenticated");
       setAuthKey("");
-      setStatusText("Sesion iniciada. Cargando reservas...");
+      setStatusText("Sesion iniciada. Cargando reservas…");
       await loadBookings();
     } catch (error) {
       setAuthState("unauthenticated");
@@ -602,6 +603,8 @@ export default function AdminBookingsPanel() {
   function handleDragStart(event, booking) {
     if (!booking?.id) return;
 
+    document.body.classList.add("is-dragging");
+
     setDraggingBooking({
       id: booking.id,
       status: booking.status || "pending"
@@ -616,6 +619,7 @@ export default function AdminBookingsPanel() {
   }
 
   function handleDragEnd() {
+    document.body.classList.remove("is-dragging");
     setDraggingBooking(null);
     setDragTargetStatus(null);
   }
@@ -671,16 +675,25 @@ export default function AdminBookingsPanel() {
     await updateBookingStatus(bookingId, targetStatus, "drag", {
       fromStatus: currentBooking.status || "pending"
     });
+    document.body.classList.remove("is-dragging");
     setDraggingBooking(null);
     setDragTargetStatus(null);
   }
 
   if (authState === "checking") {
-    return <p className="admin-status">Validando sesion...</p>;
+    return (
+      <p className="admin-status" role="status" aria-live="polite">
+        Validando sesion…
+      </p>
+    );
   }
 
   if (authState === "misconfigured") {
-    return <p className="admin-status">{statusText}</p>;
+    return (
+      <p className="admin-status" role="status" aria-live="polite">
+        {statusText}
+      </p>
+    );
   }
 
   if (authState !== "authenticated") {
@@ -702,7 +715,9 @@ export default function AdminBookingsPanel() {
           </button>
         </form>
 
-        <p className="admin-status">{statusText}</p>
+        <p className="admin-status" role="status" aria-live="polite">
+          {statusText}
+        </p>
       </section>
     );
   }
@@ -719,7 +734,7 @@ export default function AdminBookingsPanel() {
             <input
               value={filters.q}
               onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-              placeholder="Cliente, telefono, servicio..."
+              placeholder="Cliente, telefono, servicio…"
             />
           </label>
 
@@ -757,7 +772,7 @@ export default function AdminBookingsPanel() {
           </label>
 
           <button className="btn btn-primary" type="submit" disabled={loadingBookings}>
-            {loadingBookings ? "Filtrando..." : "Aplicar filtros"}
+            {loadingBookings ? "Filtrando…" : "Aplicar filtros"}
           </button>
 
           <button
@@ -797,7 +812,7 @@ export default function AdminBookingsPanel() {
             onClick={handleExportCsv}
             disabled={exporting}
           >
-            {exporting ? "Exportando..." : "Exportar CSV"}
+            {exporting ? "Exportando…" : "Exportar CSV"}
           </button>
           <button className="btn btn-secondary" type="button" onClick={handleLogout}>
             Cerrar sesion
@@ -805,7 +820,9 @@ export default function AdminBookingsPanel() {
         </div>
       </div>
 
-      <p className="admin-status">{statusText}</p>
+      <p className="admin-status" role="status" aria-live="polite">
+        {statusText}
+      </p>
 
       {undoState ? (
         <aside className="admin-toast" role="status" aria-live="polite">
@@ -1145,7 +1162,7 @@ export default function AdminBookingsPanel() {
                           }
                           onClick={() => handleStatusUpdate(booking.id)}
                         >
-                          {updatingId === booking.id ? "Guardando..." : "Guardar"}
+                          {updatingId === booking.id ? "Guardando…" : "Guardar"}
                         </button>
                         <button
                           className="btn btn-danger"
@@ -1153,7 +1170,7 @@ export default function AdminBookingsPanel() {
                           disabled={deletingId === booking.id || updatingId === booking.id}
                           onClick={() => handleDeleteBooking(booking.id)}
                         >
-                          {deletingId === booking.id ? "Eliminando..." : "Eliminar"}
+                          {deletingId === booking.id ? "Eliminando…" : "Eliminar"}
                         </button>
                       </div>
                     </td>

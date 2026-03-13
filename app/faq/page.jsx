@@ -50,7 +50,7 @@ const FAQ_SCHEMA = {
 
 export default function FaqPage() {
   return (
-    <main className="content-page">
+    <main id="contenido-principal" className="content-page">
       <section className="content-wrap">
         <p className="eyebrow">FAQ</p>
         <h1>Preguntas frecuentes antes de reservar</h1>

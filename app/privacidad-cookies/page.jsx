@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function PrivacyCookiesPage() {
   return (
-    <main className="policy-page">
+    <main id="contenido-principal" className="policy-page">
       <div className="policy-container">
         <p className="eyebrow">Legal</p>
         <h1>Politica de privacidad y cookies</h1>
