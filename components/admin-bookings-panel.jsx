@@ -150,6 +150,7 @@ export default function AdminBookingsPanel() {
   const [calendarWeekStart, setCalendarWeekStart] = useState(getWeekStart(todayDateKey));
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey.slice(0, 7));
   const [weeklyViewMode, setWeeklyViewMode] = useState("days");
+  const [monthlyViewMode, setMonthlyViewMode] = useState("days");
 
   useEffect(
     () => () => {
@@ -264,6 +265,41 @@ export default function AdminBookingsPanel() {
       };
     });
   }, [bookingsByDate, calendarMonth, todayDateKey]);
+
+  const monthlyCurrentDays = useMemo(
+    () => monthlyCalendar.filter((day) => day.inCurrentMonth),
+    [monthlyCalendar]
+  );
+
+  const monthlyByBarber = useMemo(() => {
+    const barberMap = new Map();
+
+    monthlyCurrentDays.forEach((day) => {
+      day.bookings.forEach((booking) => {
+        const barberName = booking.barber || "Sin barbero";
+
+        if (!barberMap.has(barberName)) {
+          barberMap.set(barberName, []);
+        }
+
+        barberMap.get(barberName).push({
+          ...booking,
+          dateKey: day.dateKey,
+          dateLabel: formatDateKey(day.dateKey, {
+            day: "2-digit",
+            month: "2-digit"
+          })
+        });
+      });
+    });
+
+    return Array.from(barberMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([barber, barberBookings]) => ({
+        barber,
+        bookings: barberBookings.sort((a, b) => toAppointmentTimestamp(a) - toAppointmentTimestamp(b))
+      }));
+  }, [monthlyCurrentDays]);
 
   const weeklyByBarber = useMemo(() => {
     const barberMap = new Map();
@@ -638,6 +674,9 @@ export default function AdminBookingsPanel() {
     }
 
     event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
     setDragTargetStatus(targetStatus);
   }
 
@@ -710,9 +749,14 @@ export default function AdminBookingsPanel() {
               autoComplete="current-password"
             />
           </label>
-          <button className="btn btn-primary" type="submit">
-            Iniciar sesion
-          </button>
+          <div className="admin-login-actions">
+            <button className="btn btn-primary" type="submit">
+              Iniciar sesion
+            </button>
+            <a className="btn btn-secondary" href="/">
+              Ir al Inicio
+            </a>
+          </div>
         </form>
 
         <p className="admin-status" role="status" aria-live="polite">
@@ -814,6 +858,9 @@ export default function AdminBookingsPanel() {
           >
             {exporting ? "Exportando…" : "Exportar CSV"}
           </button>
+          <a className="btn btn-secondary" href="/">
+            Ir al Inicio
+          </a>
           <button className="btn btn-secondary" type="button" onClick={handleLogout}>
             Cerrar sesion
           </button>
@@ -933,6 +980,7 @@ export default function AdminBookingsPanel() {
                 <div
                   key={`drop-${status}`}
                   className={`admin-drop-zone status-${status}${dragTargetStatus === status ? " is-over" : ""}`}
+                  onDragEnter={(event) => handleStatusDragOver(event, status)}
                   onDragOver={(event) => handleStatusDragOver(event, status)}
                   onDragLeave={() => handleStatusDragLeave(status)}
                   onDrop={(event) => handleStatusDrop(event, status)}
@@ -1033,6 +1081,23 @@ export default function AdminBookingsPanel() {
           <h2>Calendario mensual</h2>
           <p className="admin-status">{monthRangeLabel}</p>
 
+          <div className="admin-month-view-toggle">
+            <button
+              className={`btn ${monthlyViewMode === "days" ? "btn-primary" : "btn-secondary"}`}
+              type="button"
+              onClick={() => setMonthlyViewMode("days")}
+            >
+              Vista por dia
+            </button>
+            <button
+              className={`btn ${monthlyViewMode === "barber" ? "btn-primary" : "btn-secondary"}`}
+              type="button"
+              onClick={() => setMonthlyViewMode("barber")}
+            >
+              Vista por barbero
+            </button>
+          </div>
+
           <div className="admin-monthly-actions">
             <button className="btn btn-secondary" type="button" onClick={() => shiftCalendarMonth(-1)}>
               Mes anterior
@@ -1053,48 +1118,82 @@ export default function AdminBookingsPanel() {
           </div>
         </div>
 
-        <div className="admin-month-grid">
-          {monthlyCalendar.map((day) => (
-            <article
-              key={`month-${day.dateKey}`}
-              className={`admin-month-day${day.inCurrentMonth ? "" : " is-outside"}${day.isToday ? " is-today" : ""}`}
-            >
-              <header className="admin-month-day-head">
-                <p>{day.weekDayLabel}</p>
-                <strong>{day.shortLabel}</strong>
-              </header>
+        {monthlyViewMode === "days" ? (
+          <div className="admin-month-grid">
+            {monthlyCalendar.map((day) => (
+              <article
+                key={`month-${day.dateKey}`}
+                className={`admin-month-day${day.inCurrentMonth ? "" : " is-outside"}${day.isToday ? " is-today" : ""}`}
+              >
+                <header className="admin-month-day-head">
+                  <p>{day.weekDayLabel}</p>
+                  <strong>{day.shortLabel}</strong>
+                </header>
 
-              {day.bookings.length === 0 ? (
-                <p className="admin-week-empty">Sin reservas</p>
-              ) : (
-                <ul className="admin-month-list">
-                  {day.bookings.slice(0, 6).map((booking) => (
+                {day.bookings.length === 0 ? (
+                  <p className="admin-week-empty">Sin reservas</p>
+                ) : (
+                  <ul className="admin-month-list">
+                    {day.bookings.slice(0, 6).map((booking) => (
+                      <li
+                        key={`month-booking-${day.dateKey}-${booking.id}`}
+                        className={`admin-month-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                        draggable={updatingId !== booking.id && deletingId !== booking.id}
+                        onDragStart={(event) => handleDragStart(event, booking)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <p className="admin-week-time">{booking.appointment_time}</p>
+                        <strong>{booking.name}</strong>
+                        <p>
+                          {booking.service} · {booking.barber}
+                        </p>
+                        <span className={`status-pill status-${booking.status || "pending"}`}>
+                          {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {day.bookings.length > 6 ? (
+                  <p className="admin-month-more">+{day.bookings.length - 6} turnos</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : monthlyByBarber.length === 0 ? (
+          <p className="admin-week-empty">No hay reservas en este mes.</p>
+        ) : (
+          <div className="admin-month-barber-rows">
+            {monthlyByBarber.map((group) => (
+              <article key={`month-barber-${group.barber}`} className="admin-month-barber-row">
+                <header className="admin-month-barber-head">
+                  <h3>{group.barber}</h3>
+                  <p>{group.bookings.length} turnos</p>
+                </header>
+
+                <ul className="admin-month-barber-list">
+                  {group.bookings.map((booking) => (
                     <li
-                      key={`month-booking-${day.dateKey}-${booking.id}`}
-                      className={`admin-month-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                      key={`month-barber-booking-${booking.id}-${booking.dateKey}`}
+                      className={`admin-month-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
                       draggable={updatingId !== booking.id && deletingId !== booking.id}
                       onDragStart={(event) => handleDragStart(event, booking)}
                       onDragEnd={handleDragEnd}
                     >
-                      <p className="admin-week-time">{booking.appointment_time}</p>
+                      <p className="admin-week-time">{booking.dateLabel} · {booking.appointment_time}</p>
                       <strong>{booking.name}</strong>
-                      <p>
-                        {booking.service} · {booking.barber}
-                      </p>
+                      <p>{booking.service}</p>
                       <span className={`status-pill status-${booking.status || "pending"}`}>
                         {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
                       </span>
                     </li>
                   ))}
                 </ul>
-              )}
-
-              {day.bookings.length > 6 ? (
-                <p className="admin-month-more">+{day.bookings.length - 6} turnos</p>
-              ) : null}
-            </article>
-          ))}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="admin-table-wrap">
