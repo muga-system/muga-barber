@@ -296,9 +296,24 @@ export default function AdminBookingsPanel() {
     const map = new Map();
     agendaToday.forEach((booking) => {
       const time = booking.appointment_time || "";
-      if (!time || map.has(time)) return;
-      map.set(time, booking);
+      if (!time) return;
+      if (!map.has(time)) {
+        map.set(time, []);
+      }
+      map.get(time).push(booking);
     });
+
+    map.forEach((items, key) => {
+      map.set(
+        key,
+        [...items].sort((a, b) => {
+          const aName = (a.name || "").toLowerCase();
+          const bName = (b.name || "").toLowerCase();
+          return aName.localeCompare(bName, "es");
+        })
+      );
+    });
+
     return map;
   }, [agendaToday]);
 
@@ -1028,20 +1043,51 @@ export default function AdminBookingsPanel() {
       <section className="admin-agenda" aria-label="Agenda del dia">
         <h2>Agenda de hoy</h2>
 
-        <div className="admin-agenda-today-grid" aria-label="Horarios de hoy">
+        <ul className="admin-agenda-slot-list" aria-label="Horarios de hoy">
           {AGENDA_TIME_SLOTS.map((time) => {
-            const booking = agendaTodayByTime.get(time);
-            const status = booking?.status || "";
+            const bookingsAtTime = agendaTodayByTime.get(time) || [];
+            const visibleBookings = bookingsAtTime.slice(0, 3);
+            const columns = Math.min(Math.max(visibleBookings.length, 1), 3);
 
             return (
-              <span
+              <li
                 key={`agenda-today-${time}`}
-                className={`agenda-slot${booking ? " is-taken" : " is-free"}${status ? ` status-${status}` : ""}`}
-                title={booking ? `${time} · ${booking.name} · ${booking.service}` : `${time} · Disponible`}
-              />
+                className={`admin-agenda-slot-card${bookingsAtTime.length > 0 ? " is-booked" : " is-free"}`}
+                title={bookingsAtTime.length > 0 ? `${time} · ${bookingsAtTime.length} reservas` : `${time} · Disponible`}
+              >
+                {bookingsAtTime.length === 0 ? (
+                  <div className="agenda-slot-empty">
+                    <p className="slot-card-time">{time}</p>
+                    <strong className="slot-card-name">Disponible</strong>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="agenda-slot-columns"
+                      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+                      aria-label={`Clientes ${time}`}
+                    >
+                      {visibleBookings.map((booking, index) => (
+                        <article
+                          key={getBookingRenderKey(booking, `agenda-time-${time}`, index)}
+                          className={`agenda-slot-column status-${booking.status || "pending"}`}
+                          title={`${booking.name} · ${booking.service}`}
+                        >
+                          <p className="slot-card-time">{booking.appointment_time || time}</p>
+                          <strong className="slot-card-name">{getShortName(booking.name)}</strong>
+                          <p className="slot-card-service">{booking.service}</p>
+                        </article>
+                      ))}
+                    </div>
+                    {bookingsAtTime.length > 3 ? (
+                      <p className="slot-card-more">+{bookingsAtTime.length - 3} más</p>
+                    ) : null}
+                  </>
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
       </section>
 
       <section className="admin-weekly" aria-label="Calendario semanal">
