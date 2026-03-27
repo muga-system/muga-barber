@@ -7,6 +7,19 @@ import ThemeInitializer from "../components/theme-initializer";
 import { businessName, siteUrl } from "../lib/seo";
 import "./globals.css";
 
+const THEME_BOOTSTRAP_SCRIPT = `(() => {
+  try {
+    const key = "muga-theme-preference";
+    const stored = localStorage.getItem(key) || "system";
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = stored === "dark" || (stored === "system" && prefersDark) ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+  } catch (_) {
+    // noop
+  }
+})();`;
+
 const fontBody = Source_Sans_3({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -44,12 +57,18 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#f3f1ec"
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f3f1ec" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1116" }
+  ]
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body className={`${fontBody.variable} ${fontDisplay.variable}`}>
         <ThemeInitializer />
         <a className="skip-link" href="#contenido-principal">

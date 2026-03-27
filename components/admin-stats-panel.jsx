@@ -54,19 +54,19 @@ const RANGE_OPTIONS = [
 ];
 
 const STATUS_COLORS = {
-  pending: "#d9a441",
-  confirmed: "#4da678",
-  completed: "#4f8dc7",
-  cancelled: "#c8655e"
+  pending: "#c59a49",
+  confirmed: "#4f9e7a",
+  completed: "#5a88bb",
+  cancelled: "#be6a64"
 };
 
-const CHART_COLORS = ["#c7a26a", "#7ab89a", "#7eaed1", "#d77b73", "#9d88c7", "#7d97a5"];
+const CHART_COLORS = ["#b79a6c", "#6ea487", "#769cbc", "#bf7772", "#8e82b2", "#78929f"];
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "#1f1a15",
-  border: "1px solid #3a3229",
+  backgroundColor: "var(--tooltip-bg)",
+  border: "1px solid var(--tooltip-border)",
   borderRadius: "10px",
-  color: "#f1e9dd"
+  color: "var(--tooltip-text)"
 };
 
 export default function AdminStatsPanel() {
@@ -335,11 +335,11 @@ export default function AdminStatsPanel() {
           <div className="stats-chart-wrap">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={stats.dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(150,140,130,0.25)" />
-                <XAxis dataKey="label" tick={{ fill: "#8b847b", fontSize: 12 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "#8b847b", fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="label" tick={{ fill: "var(--chart-axis)", fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => [`${value} turnos`, "Demanda"]} />
-                <Area type="monotone" dataKey="total" stroke="#6f5b46" fill="rgba(111, 91, 70, 0.24)" strokeWidth={2} />
+                <Area type="monotone" dataKey="total" stroke="var(--chart-stroke)" fill="var(--chart-fill)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -365,7 +365,7 @@ export default function AdminStatsPanel() {
                   ))}
                 </Pie>
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => [`${value} reservas`, "Total"]} />
-                <Legend wrapperStyle={{ fontSize: "12px", color: "#8b847b" }} />
+                <Legend wrapperStyle={{ fontSize: "12px", color: "var(--chart-axis)" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -376,9 +376,9 @@ export default function AdminStatsPanel() {
           <div className="stats-chart-wrap stats-chart-wrap-sm">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.topServices} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(150,140,130,0.25)" />
-                <XAxis dataKey="name" tick={{ fill: "#8b847b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "#8b847b", fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="name" tick={{ fill: "var(--chart-axis)", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => [`${value} reservas`, "Total"]} />
                 <Bar dataKey="total" radius={[8, 8, 0, 0]}>
                   {stats.topServices.map((item, index) => (

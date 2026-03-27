@@ -1,6 +1,6 @@
 import BookingForm from "../components/booking-form";
 import Footer from "../components/footer";
-import Header from "../components/header";
+import HomeSideNav from "../components/home-side-nav";
 import { ArrowRight, CalendarClock, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react";
 import { getLocalBusinessSchema } from "../lib/seo";
 
@@ -107,7 +107,7 @@ const HOME_SCHEMA = getLocalBusinessSchema("/");
 export default function HomePage() {
   return (
     <>
-      <Header />
+      <HomeSideNav />
 
       <main id="contenido-principal">
         <section id="inicio" className="hero">
