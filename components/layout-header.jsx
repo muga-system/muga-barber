@@ -19,10 +19,11 @@ export default function LayoutHeader() {
   const pathname = usePathname();
   const isHomePage = pathname === "/";
   const isAdminPage = pathname.startsWith("/admin");
+  const isBookingPath = pathname === "/reservar" || pathname.startsWith("/reservar/");
 
   if (isHomePage || isAdminPage) return null;
 
-  if (MENU_ONLY_PATHS.has(pathname)) {
+  if (isBookingPath || MENU_ONLY_PATHS.has(pathname)) {
     return <SectionMenuButton />;
   }
 

@@ -26,6 +26,69 @@ const INITIAL_FORM = {
   time: ""
 };
 
+const FIELD_LABELS = {
+  name: "Nombre y apellido",
+  phone: "WhatsApp",
+  service: "Servicio",
+  barber: "Barbero",
+  date: "Fecha",
+  time: "Hora"
+};
+
+function normalizePhoneDigits(phone) {
+  return (phone || "").replace(/\D/g, "");
+}
+
+function validateBookingForm(formData) {
+  const errors = {};
+
+  if (!formData.name || formData.name.trim().length < 2) {
+    errors.name = "Ingresa un nombre valido (minimo 2 caracteres).";
+  }
+
+  const phoneDigits = normalizePhoneDigits(formData.phone);
+  if (!phoneDigits) {
+    errors.phone = "Ingresa un WhatsApp de contacto.";
+  } else if (phoneDigits.length < 8) {
+    errors.phone = "El WhatsApp debe tener al menos 8 digitos.";
+  } else if (/^(\d)\1+$/.test(phoneDigits)) {
+    errors.phone = "Ese WhatsApp no parece valido. Revisa el numero completo.";
+  }
+
+  if (!SERVICES.includes(formData.service)) {
+    errors.service = "Selecciona un servicio de la lista.";
+  }
+
+  if (!BARBERS.includes(formData.barber)) {
+    errors.barber = "Selecciona un barbero de la lista.";
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.date || "")) {
+    errors.date = "Selecciona una fecha valida.";
+  }
+
+  if (!TIME_SLOTS.includes(formData.time)) {
+    errors.time = "Selecciona un horario disponible.";
+  }
+
+  return errors;
+}
+
+function normalizeServerFieldErrors(details) {
+  if (!details || typeof details !== "object") {
+    return {};
+  }
+
+  return Object.entries(details).reduce((accumulator, [field, messages]) => {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return accumulator;
+    }
+
+    accumulator[field] = messages[0];
+    return accumulator;
+  }, {});
+}
+
 function buildMessage(formData, bookingId) {
   const details = [
     "Hola, quiero reservar un turno en Muga Barber:",
@@ -50,7 +113,15 @@ function getTodayISODate() {
 
 function saveToLocalStorage(booking) {
   const existing = JSON.parse(localStorage.getItem("muga_bookings") || "[]");
-  existing.unshift(booking);
+  const normalized = {
+    ...booking,
+    appointment_date: booking.appointment_date || booking.date || "",
+    appointment_time: booking.appointment_time || booking.time || "",
+    created_at: booking.created_at || booking.createdAt || new Date().toISOString(),
+    updated_at: booking.updated_at || booking.createdAt || new Date().toISOString()
+  };
+
+  existing.unshift(normalized);
   localStorage.setItem("muga_bookings", JSON.stringify(existing.slice(0, 100)));
 }
 
@@ -59,8 +130,19 @@ function getLocalBookings() {
 }
 
 export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
-  const [formData, setFormData] = useState(INITIAL_FORM);
+  const [formData, setFormData] = useState(() => {
+    if (!preselectedTime || !TIME_SLOTS.includes(preselectedTime)) {
+      return INITIAL_FORM;
+    }
+
+    return {
+      ...INITIAL_FORM,
+      date: getTodayISODate(),
+      time: preselectedTime
+    };
+  });
   const [notice, setNotice] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(null);
   const minDate = useMemo(() => getTodayISODate(), []);
@@ -77,17 +159,18 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
     }));
   }, [preselectedTime, minDate]);
 
-  const isValid =
-    formData.name &&
-    formData.phone &&
-    formData.service &&
-    formData.barber &&
-    formData.date &&
-    formData.time;
-
   function handleFieldChange(event) {
     const { name, value } = event.target;
     setFormData((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => {
+      if (!current[name]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
   }
 
   async function handleSubmit(event) {
@@ -97,13 +180,16 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
       return;
     }
 
-    if (!isValid) {
-      setNotice("Revisa los campos obligatorios para continuar.");
+    const localErrors = validateBookingForm(formData);
+    if (Object.keys(localErrors).length > 0) {
+      setFieldErrors(localErrors);
+      setNotice("Revisa los campos marcados para enviar la reserva.");
       trackEvent("submit_reserva_incompleta");
       return;
     }
 
     setIsSubmitting(true);
+    setFieldErrors({});
     setNotice("Guardando tu reserva…");
 
     try {
@@ -117,6 +203,15 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (payload.details) {
+          const serverErrors = normalizeServerFieldErrors(payload.details);
+          if (Object.keys(serverErrors).length > 0) {
+            setFieldErrors(serverErrors);
+            setNotice("Corrige los campos marcados e intenta nuevamente.");
+            return;
+          }
+        }
+
         throw new Error(payload.error || "No se pudo registrar la reserva.");
       }
 
@@ -170,6 +265,7 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
     setBookingComplete(null);
     setFormData(INITIAL_FORM);
     setNotice("");
+    setFieldErrors({});
   }
 
   if (bookingComplete) {
@@ -207,8 +303,11 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
           autoComplete="name"
           value={formData.name}
           onChange={handleFieldChange}
+          aria-invalid={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? "booking-error-name" : undefined}
           required
         />
+        {fieldErrors.name ? <span id="booking-error-name" className="field-error">{fieldErrors.name}</span> : null}
       </label>
 
       <label>
@@ -221,13 +320,23 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
           placeholder="+54 9 11 1234 5678…"
           value={formData.phone}
           onChange={handleFieldChange}
+          aria-invalid={Boolean(fieldErrors.phone)}
+          aria-describedby={fieldErrors.phone ? "booking-error-phone" : undefined}
           required
         />
+        {fieldErrors.phone ? <span id="booking-error-phone" className="field-error">{fieldErrors.phone}</span> : null}
       </label>
 
       <label>
         Servicio
-        <select name="service" value={formData.service} onChange={handleFieldChange} required>
+        <select
+          name="service"
+          value={formData.service}
+          onChange={handleFieldChange}
+          aria-invalid={Boolean(fieldErrors.service)}
+          aria-describedby={fieldErrors.service ? "booking-error-service" : undefined}
+          required
+        >
           <option value="">Selecciona una opcion</option>
           {SERVICES.map((service) => (
             <option key={service} value={service}>
@@ -235,11 +344,19 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
             </option>
           ))}
         </select>
+        {fieldErrors.service ? <span id="booking-error-service" className="field-error">{fieldErrors.service}</span> : null}
       </label>
 
       <label>
         Barbero
-        <select name="barber" value={formData.barber} onChange={handleFieldChange} required>
+        <select
+          name="barber"
+          value={formData.barber}
+          onChange={handleFieldChange}
+          aria-invalid={Boolean(fieldErrors.barber)}
+          aria-describedby={fieldErrors.barber ? "booking-error-barber" : undefined}
+          required
+        >
           <option value="">Selecciona una opcion</option>
           {BARBERS.map((barber) => (
             <option key={barber} value={barber}>
@@ -247,6 +364,7 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
             </option>
           ))}
         </select>
+        {fieldErrors.barber ? <span id="booking-error-barber" className="field-error">{fieldErrors.barber}</span> : null}
       </label>
 
       <div className="field-row">
@@ -258,13 +376,23 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
             min={minDate}
             value={formData.date}
             onChange={handleFieldChange}
+            aria-invalid={Boolean(fieldErrors.date)}
+            aria-describedby={fieldErrors.date ? "booking-error-date" : undefined}
             required
           />
+          {fieldErrors.date ? <span id="booking-error-date" className="field-error">{fieldErrors.date}</span> : null}
         </label>
 
         <label>
           Hora
-          <select name="time" value={formData.time} onChange={handleFieldChange} required>
+          <select
+            name="time"
+            value={formData.time}
+            onChange={handleFieldChange}
+            aria-invalid={Boolean(fieldErrors.time)}
+            aria-describedby={fieldErrors.time ? "booking-error-time" : undefined}
+            required
+          >
             <option value="">Hora</option>
             {TIME_SLOTS.map((slot) => (
               <option key={slot} value={slot}>
@@ -272,14 +400,28 @@ export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
               </option>
             ))}
           </select>
+          {fieldErrors.time ? <span id="booking-error-time" className="field-error">{fieldErrors.time}</span> : null}
         </label>
       </div>
+
+      {Object.keys(fieldErrors).length > 0 ? (
+        <div className="form-errors" role="alert" aria-live="assertive">
+          <p>Necesitamos que corrijas esto antes de enviar:</p>
+          <ul>
+            {Object.entries(fieldErrors).map(([field, message]) => (
+              <li key={field}>
+                <strong>{FIELD_LABELS[field] || field}:</strong> {message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Guardando…" : "Reservar turno"}
       </button>
       <p className="form-privacy">Tus datos se usan solo para confirmar tu turno.</p>
-      <p className="form-note" role="status" aria-live="polite">
+      <p className={`form-note${Object.keys(fieldErrors).length > 0 ? " is-error" : ""}`} role="status" aria-live="polite">
         {notice}
       </p>
     </form>

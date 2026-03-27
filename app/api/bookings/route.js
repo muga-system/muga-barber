@@ -18,13 +18,39 @@ import {
   deleteDemoBooking
 } from "../../../lib/demo-bookings";
 
+function extractPhoneDigits(phone) {
+  return (phone || "").replace(/\D/g, "");
+}
+
 const bookingSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  phone: z.string().trim().min(7).max(40),
-  service: z.string().trim().min(2).max(80),
-  barber: z.string().trim().min(2).max(80),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  time: z.string().regex(/^\d{2}:\d{2}$/)
+  name: z.string().trim().min(2, "Ingresa un nombre valido (minimo 2 caracteres).").max(120),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "Ingresa un WhatsApp de contacto.")
+    .max(40)
+    .superRefine((value, context) => {
+      const digits = extractPhoneDigits(value);
+
+      if (digits.length < 8) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El WhatsApp debe tener al menos 8 digitos."
+        });
+        return;
+      }
+
+      if (/^(\d)\1+$/.test(digits)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Ese WhatsApp no parece valido. Revisa el numero completo."
+        });
+      }
+    }),
+  service: z.string().trim().min(2, "Selecciona un servicio.").max(80),
+  barber: z.string().trim().min(2, "Selecciona un barbero.").max(80),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona una fecha valida."),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "Selecciona un horario valido.")
 });
 
 function cleanPhone(phone) {

@@ -124,6 +124,62 @@ function getStatusLabel(status) {
   return BOOKING_STATUS_LABELS[status] || status;
 }
 
+function normalizeBookingRecord(record) {
+  return {
+    ...record,
+    appointment_date: record.appointment_date || record.date || "",
+    appointment_time: record.appointment_time || record.time || "",
+    created_at: record.created_at || record.createdAt || new Date().toISOString(),
+    updated_at: record.updated_at || record.updatedAt || record.created_at || record.createdAt || new Date().toISOString(),
+    status: record.status || "pending"
+  };
+}
+
+function getLocalBookingsSafe() {
+  try {
+    const stored = localStorage.getItem("muga_bookings");
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map(normalizeBookingRecord);
+  } catch {
+    return [];
+  }
+}
+
+function mergeBookings(primaryBookings, secondaryBookings) {
+  const merged = [];
+  const seen = new Set();
+
+  [...primaryBookings, ...secondaryBookings].forEach((booking) => {
+    const normalized = normalizeBookingRecord(booking);
+    const signature = `${normalized.id}-${normalized.created_at}-${normalized.appointment_date}-${normalized.appointment_time}`;
+
+    if (seen.has(signature)) {
+      return;
+    }
+
+    seen.add(signature);
+    merged.push(normalized);
+  });
+
+  return merged;
+}
+
+function getBookingRenderKey(booking, scope, suffix = "") {
+  return [
+    scope,
+    booking.id,
+    booking.created_at || "",
+    booking.updated_at || "",
+    booking.appointment_date || booking.dateKey || "",
+    booking.appointment_time || "",
+    suffix
+  ].join("-");
+}
+
 function EmptyCalendarState() {
   return (
     <p className="admin-week-empty" aria-label="Sin reservas" title="Sin reservas">
@@ -150,16 +206,9 @@ export default function AdminBookingsPanel() {
   const undoTimerRef = useRef(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("muga_bookings");
-    if (stored) {
-      const localBookings = JSON.parse(stored);
-      if (localBookings.length > 0) {
-        setBookings((prev) => {
-          const existingIds = new Set(prev.map((b) => b.id));
-          const newBookings = localBookings.filter((b) => !existingIds.has(b.id));
-          return [...prev, ...newBookings];
-        });
-      }
+    const localBookings = getLocalBookingsSafe();
+    if (localBookings.length > 0) {
+      setBookings((prev) => mergeBookings(prev, localBookings));
     }
   }, []);
 
@@ -470,19 +519,22 @@ export default function AdminBookingsPanel() {
         throw new Error(payload.error || "No se pudieron cargar las reservas.");
       }
 
-      const nextBookings = payload.bookings || [];
+      const nextBookings = (payload.bookings || []).map(normalizeBookingRecord);
+      const localBookings = getLocalBookingsSafe();
+      const mergedBookings = mergeBookings(nextBookings, localBookings);
+
       clearUndoState();
-      setBookings(nextBookings);
+      setBookings(mergedBookings);
       setDraggingBooking(null);
       setDragTargetStatus(null);
 
       const draftMap = {};
-      nextBookings.forEach((booking) => {
+      mergedBookings.forEach((booking) => {
         draftMap[booking.id] = booking.status || "pending";
       });
       setStatusDrafts(draftMap);
 
-      setStatusText(`Reservas cargadas: ${nextBookings.length}`);
+      setStatusText(`Reservas cargadas: ${mergedBookings.length}`);
     } catch (error) {
       setBookings([]);
       setStatusDrafts({});
@@ -979,8 +1031,8 @@ export default function AdminBookingsPanel() {
           <p className="admin-status">No hay turnos cargados para hoy.</p>
         ) : (
           <ul className="admin-agenda-list">
-            {agendaToday.map((booking) => (
-              <li key={`agenda-${booking.id}`} className="admin-agenda-item">
+            {agendaToday.map((booking, index) => (
+              <li key={getBookingRenderKey(booking, "agenda", index)} className="admin-agenda-item">
                 <p className="admin-agenda-time">{booking.appointment_time}</p>
                 <div>
                   <strong>{booking.name}</strong>
@@ -1068,9 +1120,9 @@ export default function AdminBookingsPanel() {
                   <EmptyCalendarState />
                 ) : (
                   <ul className="admin-week-list">
-                    {day.bookings.map((booking) => (
+                    {day.bookings.map((booking, index) => (
                     <li
-                      key={`week-${day.dateKey}-${booking.id}`}
+                      key={getBookingRenderKey(booking, `week-${day.dateKey}`, index)}
                       className={`admin-week-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
                       draggable={updatingId !== booking.id && deletingId !== booking.id}
                       onDragStart={(event) => handleDragStart(event, booking)}
@@ -1112,9 +1164,9 @@ export default function AdminBookingsPanel() {
                         <EmptyCalendarState />
                       ) : (
                         <ul className="admin-week-barber-list">
-                          {day.bookings.map((booking) => (
+                          {day.bookings.map((booking, index) => (
                             <li
-                              key={`barber-week-${booking.id}-${day.dateKey}`}
+                              key={getBookingRenderKey(booking, `barber-week-${day.dateKey}`, index)}
                               className={`admin-week-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
                               draggable={updatingId !== booking.id && deletingId !== booking.id}
                               onDragStart={(event) => handleDragStart(event, booking)}
@@ -1197,9 +1249,9 @@ export default function AdminBookingsPanel() {
                   <EmptyCalendarState />
                 ) : (
                   <ul className="admin-month-list">
-                    {day.bookings.slice(0, 6).map((booking) => (
+                    {day.bookings.slice(0, 6).map((booking, index) => (
                       <li
-                        key={`month-booking-${day.dateKey}-${booking.id}`}
+                        key={getBookingRenderKey(booking, `month-booking-${day.dateKey}`, index)}
                         className={`admin-month-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
                         draggable={updatingId !== booking.id && deletingId !== booking.id}
                         onDragStart={(event) => handleDragStart(event, booking)}
@@ -1236,9 +1288,9 @@ export default function AdminBookingsPanel() {
                 </header>
 
                 <ul className="admin-month-barber-list">
-                  {group.bookings.map((booking) => (
+                  {group.bookings.map((booking, index) => (
                     <li
-                      key={`month-barber-booking-${booking.id}-${booking.dateKey}`}
+                      key={getBookingRenderKey(booking, `month-barber-booking-${booking.dateKey}`, index)}
                       className={`admin-month-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
                       draggable={updatingId !== booking.id && deletingId !== booking.id}
                       onDragStart={(event) => handleDragStart(event, booking)}
@@ -1280,11 +1332,11 @@ export default function AdminBookingsPanel() {
                 <td colSpan={9}>Sin datos para mostrar.</td>
               </tr>
             ) : (
-              sortedBookings.map((booking) => {
+              sortedBookings.map((booking, index) => {
                 const draftStatus = statusDrafts[booking.id] || booking.status || "pending";
 
                 return (
-                  <tr key={booking.id}>
+                  <tr key={getBookingRenderKey(booking, "table", index)}>
                     <td>#{booking.id}</td>
                     <td>{booking.name}</td>
                     <td>{booking.phone}</td>

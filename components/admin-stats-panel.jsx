@@ -410,7 +410,7 @@ export default function AdminStatsPanel() {
         ) : (
           <ul className="stats-list">
             {stats.upcoming.map((booking) => (
-              <li key={`next-${booking.id}`}>
+              <li key={`next-${booking.id}-${booking.appointment_date || ""}-${booking.appointment_time || ""}`}>
                 <span>
                   {formatDateLabel(normalizeDateKey(booking.appointment_date))} · {booking.appointment_time || "--:--"} · {booking.name}
                 </span>
