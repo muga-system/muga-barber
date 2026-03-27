@@ -9,6 +9,7 @@ import {
   House,
   MapPin,
   Menu,
+  MessageSquareQuote,
   Scissors,
   ShieldCheck,
   UserRound
@@ -18,7 +19,8 @@ const SECTION_LINKS = [
   { id: "inicio", label: "Inicio", Icon: House },
   { id: "servicios", label: "Servicios", Icon: Scissors },
   { id: "experiencia", label: "Experiencia", Icon: Briefcase },
-  { id: "testimonios", label: "Testimonios", Icon: ShieldCheck },
+  { id: "testimonios", label: "Testimonios", Icon: MessageSquareQuote },
+  { id: "garantias", label: "Garantias", Icon: ShieldCheck },
   { id: "reservar", label: "Reservar", Icon: CalendarCheck2 }
 ];
 
@@ -111,16 +113,16 @@ export default function HomeSideNav() {
 
   return (
     <>
-      <aside className="home-side-nav" aria-label="Navegacion rapida de secciones">
-        <button
-          type="button"
-          className="home-side-nav-more"
-          aria-label="Ver paginas y accesos"
-          onClick={() => setIsModalOpen(true)}
-        >
-          <Menu size={14} aria-hidden="true" />
-        </button>
+      <button
+        type="button"
+        className="home-side-nav-more home-side-nav-more-top"
+        aria-label="Ver paginas y accesos"
+        onClick={() => setIsModalOpen(true)}
+      >
+        <Menu size={14} aria-hidden="true" />
+      </button>
 
+      <aside className="home-side-nav" aria-label="Navegacion rapida de secciones">
         <nav className="home-side-nav-links">
           {SECTION_LINKS.map((section) => {
             const Icon = section.Icon;
