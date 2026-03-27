@@ -1,7 +1,9 @@
-import BookingForm from "../../components/booking-form";
-import Footer from "../../components/footer";
-import Breadcrumb from "../../components/breadcrumb";
-import { resolveBookingTimeParam } from "../../lib/booking-time";
+import BookingForm from "../../../components/booking-form";
+import Footer from "../../../components/footer";
+import Breadcrumb from "../../../components/breadcrumb";
+import { resolveBookingTimeParam } from "../../../lib/booking-time";
+
+const WHATSAPP_NUMBER = "5491112345678";
 
 export const metadata = {
   title: "Reservar turno online",
@@ -12,12 +14,9 @@ export const metadata = {
   }
 };
 
-const WHATSAPP_NUMBER = "5491112345678";
-
-export default async function ReservarPage({ searchParams }) {
-  const resolvedSearchParams = await searchParams;
-  const requestedTime = resolvedSearchParams?.hora || resolvedSearchParams?.time || "";
-  const preselectedTime = resolveBookingTimeParam(requestedTime);
+export default async function ReservarTimePage({ params }) {
+  const resolvedParams = await params;
+  const preselectedTime = resolveBookingTimeParam(resolvedParams?.time || "");
 
   return (
     <main id="contenido-principal" className="content-page">

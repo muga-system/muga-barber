@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
 
@@ -58,12 +58,24 @@ function getLocalBookings() {
   return JSON.parse(localStorage.getItem("muga_bookings") || "[]");
 }
 
-export default function BookingForm({ whatsappNumber }) {
+export default function BookingForm({ whatsappNumber, preselectedTime = "" }) {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(null);
   const minDate = useMemo(() => getTodayISODate(), []);
+
+  useEffect(() => {
+    if (!preselectedTime || !TIME_SLOTS.includes(preselectedTime)) {
+      return;
+    }
+
+    setFormData((current) => ({
+      ...current,
+      date: current.date || minDate,
+      time: preselectedTime
+    }));
+  }, [preselectedTime, minDate]);
 
   const isValid =
     formData.name &&

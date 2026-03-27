@@ -1,5 +1,6 @@
 import BookingForm from "../components/booking-form";
 import Footer from "../components/footer";
+import HeroAvailabilityCard from "../components/hero-availability-card";
 import HomeSideNav from "../components/home-side-nav";
 import { ArrowRight, CalendarClock, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react";
 import { getLocalBusinessSchema } from "../lib/seo";
@@ -148,18 +149,7 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <aside className="hero-availability" aria-label="Disponibilidad de hoy">
-            <p className="eyebrow">Disponibilidad de hoy</p>
-            <h2>Ultimos cupos activos</h2>
-            <ul className="slot-list">
-              {TODAY_SLOTS.map((slot) => (
-                <li key={slot}>{slot}</li>
-              ))}
-            </ul>
-            <a className="btn btn-primary" href="/reservar" data-track="click_reservar_slots">
-              Tomar horario
-            </a>
-          </aside>
+          <HeroAvailabilityCard slots={TODAY_SLOTS} />
         </section>
 
         <section id="servicios" className="section">
