@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Ubicacion y horarios",
   description:
@@ -10,7 +13,8 @@ export const metadata = {
 export default function UbicacionPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Ubicacion</p>
         <h1>Estamos en el centro para que reserves y llegues sin rodeos</h1>
 
@@ -34,7 +38,8 @@ export default function UbicacionPage() {
         <a className="btn btn-primary" href="/reservar" data-track="click_reservar_ubicacion_page">
           Reservar turno
         </a>
-      </section>
+      </div>
+      <Footer />
     </main>
   );
 }

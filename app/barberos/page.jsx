@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Barberos y especialidades",
   description:
@@ -31,7 +34,8 @@ const BARBERS = [
 export default function BarberosPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Equipo</p>
         <h1>Profesionales para resultados consistentes en cada visita</h1>
         <p className="content-lead">
@@ -51,7 +55,8 @@ export default function BarberosPage() {
         <a className="btn btn-primary" href="/reservar" data-track="click_reservar_barberos_page">
           Elegir horario
         </a>
-      </section>
+      </div>
+      <Footer />
     </main>
   );
 }

@@ -1,4 +1,6 @@
 import BookingForm from "../../components/booking-form";
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
 
 export const metadata = {
   title: "Reservar turno online",
@@ -14,7 +16,8 @@ const WHATSAPP_NUMBER = "5491112345678";
 export default function ReservarPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Reserva online</p>
         <h1>Elige tu servicio y asegura tu horario</h1>
         <p className="content-lead">
@@ -23,7 +26,8 @@ export default function ReservarPage() {
         </p>
 
         <BookingForm whatsappNumber={WHATSAPP_NUMBER} />
-      </section>
+      </div>
+      <Footer />
     </main>
   );
 }

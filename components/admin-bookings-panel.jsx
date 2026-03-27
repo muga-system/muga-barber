@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BOOKING_STATUSES, BOOKING_STATUS_LABELS } from "../lib/booking-status";
+import { CalendarMinus2, Eye, EyeOff } from "lucide-react";
 
 function formatDate(date, time) {
   if (!date) return "-";
@@ -123,11 +124,20 @@ function getStatusLabel(status) {
   return BOOKING_STATUS_LABELS[status] || status;
 }
 
+function EmptyCalendarState() {
+  return (
+    <p className="admin-week-empty" aria-label="Sin reservas" title="Sin reservas">
+      <CalendarMinus2 size={15} aria-hidden="true" />
+    </p>
+  );
+}
+
 export default function AdminBookingsPanel() {
   const todayDateKey = new Date().toISOString().slice(0, 10);
 
   const [authState, setAuthState] = useState("checking");
-  const [authKey, setAuthKey] = useState("");
+  const [authKey, setAuthKey] = useState("demo-admin-key-2026");
+  const [showPassword, setShowPassword] = useState(false);
   const [statusText, setStatusText] = useState("Validando sesion…");
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
@@ -138,6 +148,20 @@ export default function AdminBookingsPanel() {
   const [dragTargetStatus, setDragTargetStatus] = useState(null);
   const [undoState, setUndoState] = useState(null);
   const undoTimerRef = useRef(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("muga_bookings");
+    if (stored) {
+      const localBookings = JSON.parse(stored);
+      if (localBookings.length > 0) {
+        setBookings((prev) => {
+          const existingIds = new Set(prev.map((b) => b.id));
+          const newBookings = localBookings.filter((b) => !existingIds.has(b.id));
+          return [...prev, ...newBookings];
+        });
+      }
+    }
+  }, []);
 
   const [filters, setFilters] = useState({
     q: "",
@@ -349,6 +373,21 @@ export default function AdminBookingsPanel() {
           return;
         }
 
+        if (authKey) {
+          try {
+            const autoLoginSucceeded = await authenticateSession(authKey);
+            if (autoLoginSucceeded) {
+              setAuthState("authenticated");
+              setAuthKey("");
+              setStatusText("Sesion iniciada. Cargando reservas…");
+              await loadBookings();
+              return;
+            }
+          } catch {
+            // If auto login fails, we keep the manual login form visible.
+          }
+        }
+
         setAuthState("unauthenticated");
         setStatusText("Ingresa la clave de administrador para continuar.");
       } catch {
@@ -359,6 +398,23 @@ export default function AdminBookingsPanel() {
 
     verifySession();
   }, []);
+
+  async function authenticateSession(key) {
+    const response = await fetch("/api/admin/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ key })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "Clave invalida.");
+    }
+
+    return true;
+  }
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -371,18 +427,7 @@ export default function AdminBookingsPanel() {
     setStatusText("Validando clave…");
 
     try {
-      const response = await fetch("/api/admin/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ key: authKey })
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || "Clave invalida.");
-      }
+      await authenticateSession(authKey);
 
       setAuthState("authenticated");
       setAuthKey("");
@@ -721,17 +766,25 @@ export default function AdminBookingsPanel() {
 
   if (authState === "checking") {
     return (
-      <p className="admin-status" role="status" aria-live="polite">
-        Validando sesion…
-      </p>
+      <section className="admin-panel">
+        <div className="admin-form">
+          <p className="admin-status" role="status" aria-live="polite">
+            Validando sesion…
+          </p>
+        </div>
+      </section>
     );
   }
 
   if (authState === "misconfigured") {
     return (
-      <p className="admin-status" role="status" aria-live="polite">
-        {statusText}
-      </p>
+      <section className="admin-panel">
+        <div className="admin-form">
+          <p className="admin-status" role="status" aria-live="polite">
+            {statusText}
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -741,13 +794,23 @@ export default function AdminBookingsPanel() {
         <form className="admin-form" onSubmit={handleLogin}>
           <label>
             Clave de administrador
-            <input
-              type="password"
-              value={authKey}
-              onChange={(event) => setAuthKey(event.target.value)}
-              placeholder="Ingresa la clave"
-              autoComplete="current-password"
-            />
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={authKey}
+                onChange={(event) => setAuthKey(event.target.value)}
+                placeholder="Ingresa la clave"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </label>
           <div className="admin-login-actions">
             <button className="btn btn-primary" type="submit">
@@ -1002,7 +1065,7 @@ export default function AdminBookingsPanel() {
                 </header>
 
                 {day.bookings.length === 0 ? (
-                  <p className="admin-week-empty">Sin reservas</p>
+                  <EmptyCalendarState />
                 ) : (
                   <ul className="admin-week-list">
                     {day.bookings.map((booking) => (
@@ -1029,7 +1092,7 @@ export default function AdminBookingsPanel() {
             ))}
           </div>
         ) : weeklyByBarber.length === 0 ? (
-          <p className="admin-week-empty">No hay reservas en esta semana.</p>
+          <EmptyCalendarState />
         ) : (
           <div className="admin-week-barber-rows">
             {weeklyByBarber.map((barberGroup) => (
@@ -1046,7 +1109,7 @@ export default function AdminBookingsPanel() {
                       </p>
 
                       {day.bookings.length === 0 ? (
-                        <p className="admin-week-empty">Sin reservas</p>
+                        <EmptyCalendarState />
                       ) : (
                         <ul className="admin-week-barber-list">
                           {day.bookings.map((booking) => (
@@ -1131,7 +1194,7 @@ export default function AdminBookingsPanel() {
                 </header>
 
                 {day.bookings.length === 0 ? (
-                  <p className="admin-week-empty">Sin reservas</p>
+                  <EmptyCalendarState />
                 ) : (
                   <ul className="admin-month-list">
                     {day.bookings.slice(0, 6).map((booking) => (
@@ -1162,7 +1225,7 @@ export default function AdminBookingsPanel() {
             ))}
           </div>
         ) : monthlyByBarber.length === 0 ? (
-          <p className="admin-week-empty">No hay reservas en este mes.</p>
+          <EmptyCalendarState />
         ) : (
           <div className="admin-month-barber-rows">
             {monthlyByBarber.map((group) => (

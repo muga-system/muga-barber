@@ -2,6 +2,8 @@ import { Cormorant_Garamond, Source_Sans_3 } from "next/font/google";
 import AnalyticsLoader from "../components/analytics-loader";
 import CookieConsentBanner from "../components/cookie-consent-banner";
 import TrackingEvents from "../components/tracking-events";
+import LayoutHeader from "../components/layout-header";
+import ThemeInitializer from "../components/theme-initializer";
 import { businessName, siteUrl } from "../lib/seo";
 import "./globals.css";
 
@@ -49,11 +51,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body className={`${fontBody.variable} ${fontDisplay.variable}`}>
+        <ThemeInitializer />
         <a className="skip-link" href="#contenido-principal">
           Ir al contenido principal
         </a>
         <AnalyticsLoader />
         <TrackingEvents />
+        <LayoutHeader />
         {children}
         <CookieConsentBanner />
       </body>

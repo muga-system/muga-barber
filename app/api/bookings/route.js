@@ -11,6 +11,12 @@ import {
 } from "../../../lib/bookings-db";
 import { applyBookingsFilters, parseBookingsFilters } from "../../../lib/bookings-filters";
 import { notifyNewBooking } from "../../../lib/booking-notify";
+import {
+  getDemoBookings,
+  addDemoBooking,
+  updateDemoBooking,
+  deleteDemoBooking
+} from "../../../lib/demo-bookings";
 
 const bookingSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -27,20 +33,36 @@ function cleanPhone(phone) {
 
 export async function GET(request) {
   const sql = getDb();
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+  if (isDemo) {
+    if (!isAdminConfigured()) {
+      return NextResponse.json(
+        { error: "Falta ADMIN_DASHBOARD_KEY" },
+        { status: 503 }
+      );
+    }
+
+    if (!isAdminAuthorizedRequest(request)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const parsedFilters = parseBookingsFilters(request.url);
+    const filtered = applyBookingsFilters(getDemoBookings(), parsedFilters.filters || {});
+
+    return NextResponse.json({ ok: true, bookings: filtered.slice(0, 100) }, { status: 200 });
+  }
+
   if (!sql) {
     return NextResponse.json(
-      {
-        error: "Base de datos no configurada"
-      },
+      { error: "Base de datos no configurada" },
       { status: 503 }
     );
   }
 
   if (!isAdminConfigured()) {
     return NextResponse.json(
-      {
-        error: "Falta ADMIN_DASHBOARD_KEY"
-      },
+      { error: "Falta ADMIN_DASHBOARD_KEY" },
       { status: 503 }
     );
   }
@@ -80,9 +102,7 @@ export async function GET(request) {
     return NextResponse.json({ ok: true, bookings: filtered.slice(0, 100) }, { status: 200 });
   } catch {
     return NextResponse.json(
-      {
-        error: "No pudimos cargar las reservas"
-      },
+      { error: "No pudimos cargar las reservas" },
       { status: 500 }
     );
   }
@@ -90,15 +110,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const sql = getDb();
-  if (!sql) {
-    return NextResponse.json(
-      {
-        error:
-          "El sistema de reservas no esta configurado todavia. Activa la base de datos para guardar turnos."
-      },
-      { status: 503 }
-    );
-  }
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   let body;
   try {
@@ -119,6 +131,38 @@ export async function POST(request) {
   }
 
   const { name, phone, service, barber, date, time } = parsed.data;
+
+  if (isDemo) {
+    const booking = addDemoBooking({
+      name,
+      phone: cleanPhone(phone),
+      service,
+      barber,
+      appointment_date: date,
+      appointment_time: time
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        bookingId: booking.id,
+        status: booking.status,
+        createdAt: booking.created_at,
+        isDemo: true
+      },
+      { status: 201 }
+    );
+  }
+
+  if (!sql) {
+    return NextResponse.json(
+      {
+        error:
+          "El sistema de reservas no esta configurado todavia. Activa la base de datos para guardar turnos."
+      },
+      { status: 503 }
+    );
+  }
 
   try {
     await ensureBookingsTable(sql);

@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Servicios de barberia premium",
   description:
@@ -28,7 +31,8 @@ const SERVICES = [
 export default function ServiciosPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Servicios</p>
         <h1>Tratamientos disenados para una imagen impecable</h1>
         <p className="content-lead">
@@ -49,7 +53,8 @@ export default function ServiciosPage() {
         <a className="btn btn-primary" href="/reservar" data-track="click_reservar_servicios_page">
           Reservar turno
         </a>
-      </section>
+      </div>
+      <Footer />
     </main>
   );
 }

@@ -6,6 +6,7 @@ import {
 import { ensureBookingsTable } from "../../../../lib/bookings-db";
 import { applyBookingsFilters, parseBookingsFilters } from "../../../../lib/bookings-filters";
 import { getDb } from "../../../../lib/db";
+import { getDemoBookings } from "../../../../lib/demo-bookings";
 
 function escapeCsvValue(value) {
   if (value === null || value === undefined) return "";
@@ -41,6 +42,33 @@ function createCsv(bookings) {
 
 export async function GET(request) {
   const sql = getDb();
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+  if (isDemo) {
+    if (!isAdminConfigured()) {
+      return NextResponse.json({ error: "Falta ADMIN_DASHBOARD_KEY" }, { status: 503 });
+    }
+
+    if (!isAdminAuthorizedRequest(request)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const parsedFilters = parseBookingsFilters(request.url);
+    const filtered = applyBookingsFilters(getDemoBookings(), parsedFilters.filters || {});
+
+    const csv = createCsv(filtered);
+    const fileName = `bookings-demo-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
   if (!sql) {
     return NextResponse.json({ error: "Base de datos no configurada" }, { status: 503 });
   }

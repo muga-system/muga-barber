@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Privacidad y Cookies | Muga Barber",
   description:
@@ -6,8 +9,9 @@ export const metadata = {
 
 export default function PrivacyCookiesPage() {
   return (
-    <main id="contenido-principal" className="policy-page">
-      <div className="policy-container">
+    <main id="contenido-principal" className="content-page">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Legal</p>
         <h1>Politica de privacidad y cookies</h1>
         <p>
@@ -50,6 +54,7 @@ export default function PrivacyCookiesPage() {
           </p>
         </section>
       </div>
+      <Footer />
     </main>
   );
 }

@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Precios de servicios",
   description:
@@ -31,7 +34,8 @@ const PRICE_TABLE = [
 export default function PreciosPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">Precios</p>
         <h1>Valores claros para decidir tu reserva sin dudas</h1>
         <p className="content-lead">
@@ -55,7 +59,8 @@ export default function PreciosPage() {
         <a className="btn btn-primary" href="/reservar" data-track="click_reservar_precios_page">
           Reservar con este precio
         </a>
-      </section>
+      </div>
+      <Footer />
     </main>
   );
 }

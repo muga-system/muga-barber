@@ -1,3 +1,6 @@
+import Footer from "../../components/footer";
+import Breadcrumb from "../../components/breadcrumb";
+
 export const metadata = {
   title: "Preguntas frecuentes de reservas",
   description:
@@ -51,7 +54,8 @@ const FAQ_SCHEMA = {
 export default function FaqPage() {
   return (
     <main id="contenido-principal" className="content-page">
-      <section className="content-wrap">
+      <div className="content-wrap">
+        <Breadcrumb />
         <p className="eyebrow">FAQ</p>
         <h1>Preguntas frecuentes antes de reservar</h1>
         <p className="content-lead">
@@ -70,7 +74,9 @@ export default function FaqPage() {
         <a className="btn btn-primary" href="/reservar" data-track="click_reservar_faq_page">
           Reservar turno
         </a>
-      </section>
+      </div>
+
+      <Footer />
 
       <script
         type="application/ld+json"

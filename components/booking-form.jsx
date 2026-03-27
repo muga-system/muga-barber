@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Check } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
 
 const SERVICES = ["Corte Signature", "Barba Ritual", "Full Grooming"];
@@ -47,10 +48,21 @@ function getTodayISODate() {
   return new Date().toISOString().split("T")[0];
 }
 
+function saveToLocalStorage(booking) {
+  const existing = JSON.parse(localStorage.getItem("muga_bookings") || "[]");
+  existing.unshift(booking);
+  localStorage.setItem("muga_bookings", JSON.stringify(existing.slice(0, 100)));
+}
+
+function getLocalBookings() {
+  return JSON.parse(localStorage.getItem("muga_bookings") || "[]");
+}
+
 export default function BookingForm({ whatsappNumber }) {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingComplete, setBookingComplete] = useState(null);
   const minDate = useMemo(() => getTodayISODate(), []);
 
   const isValid =
@@ -102,6 +114,27 @@ export default function BookingForm({ whatsappNumber }) {
         time: formData.time
       });
 
+      const bookingData = {
+        id: payload.bookingId || Date.now(),
+        name: formData.name,
+        phone: formData.phone,
+        service: formData.service,
+        barber: formData.barber,
+        date: formData.date,
+        time: formData.time,
+        status: payload.status || "confirmed",
+        isDemo: payload.isDemo || true,
+        createdAt: new Date().toISOString()
+      };
+
+      saveToLocalStorage(bookingData);
+
+      if (payload.isDemo) {
+        setBookingComplete(bookingData);
+        trackEvent("demo_booking_saved");
+        return;
+      }
+
       trackEvent("booking_api_saved", {
         bookingId: payload.bookingId,
         service: formData.service
@@ -119,6 +152,37 @@ export default function BookingForm({ whatsappNumber }) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleNewBooking() {
+    setBookingComplete(null);
+    setFormData(INITIAL_FORM);
+    setNotice("");
+  }
+
+  if (bookingComplete) {
+    return (
+      <div className="booking-success">
+        <div className="success-icon" aria-hidden="true">
+          <Check size={32} strokeWidth={3} />
+        </div>
+        <h2>Reserva confirmada</h2>
+        <div className="success-details">
+          <p><strong>Nombre:</strong> {bookingComplete.name}</p>
+          <p><strong>Servicio:</strong> {bookingComplete.service}</p>
+          <p><strong>Barbero:</strong> {bookingComplete.barber}</p>
+          <p><strong>Fecha:</strong> {bookingComplete.date}</p>
+          <p><strong>Hora:</strong> {bookingComplete.time}</p>
+        </div>
+        <p className="success-id">Código de reserva: #{bookingComplete.id}</p>
+        <p className="success-note">
+          Podés ver esta reserva en el panel de administración.
+        </p>
+        <button className="btn btn-primary" onClick={handleNewBooking}>
+          Hacer otra reserva
+        </button>
+      </div>
+    );
   }
 
   return (

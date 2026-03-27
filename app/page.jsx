@@ -1,4 +1,7 @@
 import BookingForm from "../components/booking-form";
+import Footer from "../components/footer";
+import Header from "../components/header";
+import { ArrowRight, CalendarClock, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react";
 import { getLocalBusinessSchema } from "../lib/seo";
 
 export const metadata = {
@@ -10,11 +13,21 @@ export const metadata = {
   }
 };
 
-const NAV_LINKS = [
-  { href: "#servicios", label: "Servicios" },
-  { href: "#experiencia", label: "Experiencia" },
-  { href: "#testimonios", label: "Opiniones" },
-  { href: "#garantias", label: "Garantias" }
+const TODAY_SLOTS = ["16:30", "18:00", "19:30", "20:15"];
+
+const HERO_HIGHLIGHTS = [
+  {
+    text: "Confirmacion inmediata por WhatsApp",
+    Icon: MessageCircleMore
+  },
+  {
+    text: "Atencion de lunes a sabado, 09:00 a 21:00",
+    Icon: CalendarClock
+  },
+  {
+    text: "Puntualidad y estandar tecnico garantizado",
+    Icon: ShieldCheck
+  }
 ];
 
 const SERVICES = [
@@ -51,8 +64,6 @@ const EXPERIENCE_STEPS = [
     description: "Proceso claro, puntual y orientado a un resultado consistente."
   }
 ];
-
-const TODAY_SLOTS = ["16:30", "18:00", "19:30", "20:15"];
 
 const TESTIMONIALS = [
   {
@@ -96,29 +107,15 @@ const HOME_SCHEMA = getLocalBusinessSchema("/");
 export default function HomePage() {
   return (
     <>
-      <header className="site-header">
-        <a className="brand" href="#inicio" aria-label="Ir al inicio">
-          <span className="brand-mark">MB</span>
-          <span className="brand-text">Muga Barber</span>
-        </a>
-
-        <nav className="main-nav" aria-label="Navegacion principal">
-          {NAV_LINKS.map((link) => (
-            <a key={link.href} href={link.href}>
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <a className="btn btn-primary desktop-cta" href="#reservar" data-track="click_reservar_header">
-          Reservar turno
-        </a>
-      </header>
+      <Header />
 
       <main id="contenido-principal">
         <section id="inicio" className="hero">
           <div className="hero-copy-wrap">
-            <p className="eyebrow">Barberia premium urbana</p>
+            <p className="eyebrow hero-eyebrow">
+              <Sparkles size={14} aria-hidden="true" />
+              Barberia premium urbana
+            </p>
             <h1>Reserva tu turno online y llega con todo resuelto</h1>
             <p className="hero-copy">
               Servicios claros, precios visibles y disponibilidad real para tomar
@@ -126,18 +123,28 @@ export default function HomePage() {
             </p>
 
             <div className="hero-actions">
-              <a className="btn btn-primary" href="#reservar" data-track="click_reservar_hero">
+              <a className="btn btn-primary" href="/reservar" data-track="click_reservar_hero">
                 Reservar turno
+                <ArrowRight size={16} aria-hidden="true" />
               </a>
-              <a className="btn btn-secondary" href="#servicios" data-track="click_ver_servicios_hero">
+              <a className="btn btn-secondary" href="/servicios" data-track="click_ver_servicios_hero">
                 Ver servicios
               </a>
             </div>
 
             <ul className="hero-highlights" aria-label="Beneficios principales">
-              <li>Confirmacion inmediata por WhatsApp</li>
-              <li>Atencion de lunes a sabado, 09:00 a 21:00</li>
-              <li>Puntualidad y estandar tecnico garantizado</li>
+              {HERO_HIGHLIGHTS.map((item) => {
+                const Icon = item.Icon;
+
+                return (
+                  <li key={item.text}>
+                    <span className="hero-highlight-icon" aria-hidden="true">
+                      <Icon size={14} />
+                    </span>
+                    {item.text}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -149,7 +156,7 @@ export default function HomePage() {
                 <li key={slot}>{slot}</li>
               ))}
             </ul>
-            <a className="btn btn-primary" href="#reservar" data-track="click_reservar_slots">
+            <a className="btn btn-primary" href="/reservar" data-track="click_reservar_slots">
               Tomar horario
             </a>
           </aside>
@@ -232,7 +239,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <a className="btn btn-primary" href="#reservar" data-track="click_reservar_garantias">
+          <a className="btn btn-primary" href="/reservar" data-track="click_reservar_garantias">
             Reservar turno premium
           </a>
         </section>
@@ -255,7 +262,7 @@ export default function HomePage() {
                 El equipo confirma por WhatsApp y te espera con servicio,
                 profesional y precio ya definidos.
               </p>
-              <a className="btn btn-secondary" href="#servicios" data-track="click_revisar_servicios_booking">
+              <a className="btn btn-secondary" href="/servicios" data-track="click_revisar_servicios_booking">
                 Revisar servicios
               </a>
             </aside>
@@ -263,22 +270,11 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <p>Muga Barber · Av. Central 123 · Lun a Sab 09:00 - 21:00</p>
-        <nav className="footer-links" aria-label="Enlaces secundarios">
-          <a href="/servicios">Servicios</a>
-          <a href="/precios">Precios</a>
-          <a href="/barberos">Barberos</a>
-          <a href="/reservar">Reservar</a>
-          <a href="/ubicacion">Ubicacion</a>
-          <a href="/faq">FAQ</a>
-          <a href="/privacidad-cookies">Privacidad y cookies</a>
-        </nav>
-      </footer>
+      <Footer />
 
       <a
         className="floating-cta"
-        href="#reservar"
+        href="/reservar"
         aria-label="Ir a reservar turno"
         data-track="click_reservar_floating"
       >
