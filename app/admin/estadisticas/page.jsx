@@ -1,4 +1,5 @@
 import AdminStatsPanel from "../../../components/admin-stats-panel";
+import AdminAvatarMenu from "../../../components/admin-avatar-menu";
 import AdminSidebar from "../../../components/admin-sidebar";
 
 export const metadata = {
@@ -18,6 +19,7 @@ export default function AdminEstadisticasPage() {
     <div className="admin-layout">
       <AdminSidebar />
       <main id="contenido-principal" className="admin-main">
+        <AdminAvatarMenu />
         <div className="admin-content">
           <h1>Estadisticas de reservas</h1>
           <p className="content-lead">

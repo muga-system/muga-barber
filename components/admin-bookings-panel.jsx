@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BOOKING_STATUSES, BOOKING_STATUS_LABELS } from "../lib/booking-status";
-import { CalendarMinus2, Eye, EyeOff } from "lucide-react";
+import { CalendarMinus2, Check, Eye, EyeOff, RotateCcw, Search } from "lucide-react";
+
+const AGENDA_TIME_SLOTS = ["09:00", "10:30", "12:00", "14:00", "16:30", "18:00", "19:30", "20:15"];
 
 function formatDate(date, time) {
   if (!date) return "-";
@@ -124,6 +126,11 @@ function getStatusLabel(status) {
   return BOOKING_STATUS_LABELS[status] || status;
 }
 
+function getShortName(name) {
+  if (!name) return "Cliente";
+  return String(name).trim().split(/\s+/)[0] || "Cliente";
+}
+
 function normalizeBookingRecord(record) {
   return {
     ...record,
@@ -180,6 +187,10 @@ function getBookingRenderKey(booking, scope, suffix = "") {
   ].join("-");
 }
 
+function getBookingSignature(booking) {
+  return `${booking.id}-${booking.created_at || ""}-${booking.appointment_date || ""}-${booking.appointment_time || ""}`;
+}
+
 function EmptyCalendarState() {
   return (
     <p className="admin-week-empty" aria-label="Sin reservas" title="Sin reservas">
@@ -197,9 +208,8 @@ export default function AdminBookingsPanel() {
   const [statusText, setStatusText] = useState("Validando sesion…");
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-  const [exporting, setExporting] = useState(false);
+  const [updatingKey, setUpdatingKey] = useState(null);
+  const [deletingKey, setDeletingKey] = useState(null);
   const [draggingBooking, setDraggingBooking] = useState(null);
   const [dragTargetStatus, setDragTargetStatus] = useState(null);
   const [undoState, setUndoState] = useState(null);
@@ -282,7 +292,15 @@ export default function AdminBookingsPanel() {
     [sortedBookings, todayDateKey]
   );
 
-  const queryString = useMemo(() => createQueryString(filters), [filters]);
+  const agendaTodayByTime = useMemo(() => {
+    const map = new Map();
+    agendaToday.forEach((booking) => {
+      const time = booking.appointment_time || "";
+      if (!time || map.has(time)) return;
+      map.set(time, booking);
+    });
+    return map;
+  }, [agendaToday]);
 
   const weekDays = useMemo(
     () =>
@@ -488,14 +506,6 @@ export default function AdminBookingsPanel() {
     }
   }
 
-  async function handleLogout() {
-    await fetch("/api/admin/session", { method: "DELETE" }).catch(() => null);
-    setBookings([]);
-    setStatusDrafts({});
-    setAuthState("unauthenticated");
-    setStatusText("Sesion cerrada.");
-  }
-
   async function loadBookings(overrideFilters) {
     const effectiveFilters = overrideFilters || filters;
     const effectiveQuery = createQueryString(effectiveFilters);
@@ -530,7 +540,7 @@ export default function AdminBookingsPanel() {
 
       const draftMap = {};
       mergedBookings.forEach((booking) => {
-        draftMap[booking.id] = booking.status || "pending";
+        draftMap[getBookingSignature(booking)] = booking.status || "pending";
       });
       setStatusDrafts(draftMap);
 
@@ -562,11 +572,13 @@ export default function AdminBookingsPanel() {
     }, 5000);
   }
 
-  async function updateBookingStatus(bookingId, nextStatus, source = "panel", options = {}) {
+  async function updateBookingStatus(booking, nextStatus, source = "panel", options = {}) {
     const { fromStatus, allowUndo = true } = options;
+    const bookingId = booking.id;
+    const bookingKey = getBookingSignature(booking);
     if (!nextStatus) return;
 
-    setUpdatingId(bookingId);
+    setUpdatingKey(bookingKey);
 
     try {
       const response = await fetch(`/api/bookings/${bookingId}`, {
@@ -584,7 +596,7 @@ export default function AdminBookingsPanel() {
 
       setBookings((current) =>
         current.map((booking) =>
-          String(booking.id) === String(bookingId)
+          getBookingSignature(booking) === bookingKey
             ? {
                 ...booking,
                 status: payload.booking.status,
@@ -596,12 +608,13 @@ export default function AdminBookingsPanel() {
 
       setStatusDrafts((current) => ({
         ...current,
-        [bookingId]: payload.booking.status
+        [bookingKey]: payload.booking.status
       }));
 
       if (allowUndo && fromStatus && fromStatus !== payload.booking.status) {
         openUndoState({
           bookingId,
+          bookingKey,
           fromStatus,
           toStatus: payload.booking.status
         });
@@ -618,35 +631,42 @@ export default function AdminBookingsPanel() {
     } catch (error) {
       setStatusText(error.message || "No se pudo actualizar el estado.");
     } finally {
-      setUpdatingId(null);
+      setUpdatingKey(null);
     }
   }
 
-  async function handleStatusUpdate(bookingId) {
-    const nextStatus = statusDrafts[bookingId];
-    const current = bookings.find((booking) => String(booking.id) === String(bookingId));
-    await updateBookingStatus(bookingId, nextStatus, "panel", {
-      fromStatus: current?.status
+  async function handleStatusUpdate(booking) {
+    const bookingKey = getBookingSignature(booking);
+    const nextStatus = statusDrafts[bookingKey];
+    await updateBookingStatus(booking, nextStatus, "panel", {
+      fromStatus: booking?.status
     });
   }
 
   async function handleUndoStatusChange() {
     if (!undoState) return;
 
-    const { bookingId, fromStatus, toStatus } = undoState;
+    const { bookingKey, fromStatus, toStatus } = undoState;
     clearUndoState();
 
-    await updateBookingStatus(bookingId, fromStatus, "undo", {
+    const current = bookings.find((item) => getBookingSignature(item) === bookingKey);
+    if (!current) {
+      return;
+    }
+
+    await updateBookingStatus(current, fromStatus, "undo", {
       fromStatus: toStatus,
       allowUndo: false
     });
   }
 
-  async function handleDeleteBooking(bookingId) {
+  async function handleDeleteBooking(booking) {
+    const bookingId = booking.id;
+    const bookingKey = getBookingSignature(booking);
     const confirmed = window.confirm(`Eliminar reserva #${bookingId}? Esta accion no se puede deshacer.`);
     if (!confirmed) return;
 
-    setDeletingId(bookingId);
+    setDeletingKey(bookingKey);
 
     try {
       const response = await fetch(`/api/bookings/${bookingId}`, {
@@ -658,48 +678,17 @@ export default function AdminBookingsPanel() {
         throw new Error(payload.error || "No se pudo eliminar la reserva.");
       }
 
-      setBookings((current) => current.filter((booking) => String(booking.id) !== String(bookingId)));
+      setBookings((current) => current.filter((item) => getBookingSignature(item) !== bookingKey));
       setStatusDrafts((current) => {
         const next = { ...current };
-        delete next[bookingId];
+        delete next[bookingKey];
         return next;
       });
       setStatusText(`Reserva #${bookingId} eliminada.`);
     } catch (error) {
       setStatusText(error.message || "No se pudo eliminar la reserva.");
     } finally {
-      setDeletingId(null);
-    }
-  }
-
-  async function handleExportCsv() {
-    setExporting(true);
-
-    try {
-      const endpoint = queryString ? `/api/bookings/export?${queryString}` : "/api/bookings/export";
-      const response = await fetch(endpoint, { method: "GET" });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "No se pudo exportar el CSV.");
-      }
-
-      const csv = await response.text();
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `reservas-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      setStatusText("CSV exportado correctamente.");
-    } catch (error) {
-      setStatusText(error.message || "No se pudo exportar el CSV.");
-    } finally {
-      setExporting(false);
+      setDeletingKey(null);
     }
   }
 
@@ -868,9 +857,6 @@ export default function AdminBookingsPanel() {
             <button className="btn btn-primary" type="submit">
               Iniciar sesion
             </button>
-            <a className="btn btn-secondary" href="/">
-              Ir al Inicio
-            </a>
           </div>
         </form>
 
@@ -884,26 +870,30 @@ export default function AdminBookingsPanel() {
   return (
     <section className="admin-panel">
       <div className="admin-toolbar">
-        <form className="admin-filters" onSubmit={(event) => {
-          event.preventDefault();
-          loadBookings();
-        }}>
-          <label className="admin-inline-field">
-            Buscar
+        <form
+          className="admin-filters"
+          onSubmit={(event) => {
+            event.preventDefault();
+            loadBookings();
+          }}
+        >
+          <label className="admin-inline-field admin-search-field">
+            <span className="sr-only">Buscar</span>
+            <Search size={15} aria-hidden="true" />
             <input
               value={filters.q}
               onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-              placeholder="Cliente, telefono, servicio…"
+              placeholder="Buscar cliente, servicio o telefono"
             />
           </label>
 
           <label className="admin-inline-field">
-            Estado
+            <span className="sr-only">Estado</span>
             <select
               value={filters.status}
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
             >
-              <option value="all">Todos</option>
+              <option value="all">Todos los estados</option>
               {BOOKING_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {BOOKING_STATUS_LABELS[status]}
@@ -913,7 +903,7 @@ export default function AdminBookingsPanel() {
           </label>
 
           <label className="admin-inline-field">
-            Desde
+            <span className="sr-only">Desde</span>
             <input
               type="date"
               value={filters.from}
@@ -922,7 +912,7 @@ export default function AdminBookingsPanel() {
           </label>
 
           <label className="admin-inline-field">
-            Hasta
+            <span className="sr-only">Hasta</span>
             <input
               type="date"
               value={filters.to}
@@ -931,53 +921,63 @@ export default function AdminBookingsPanel() {
           </label>
 
           <button className="btn btn-primary" type="submit" disabled={loadingBookings}>
-            {loadingBookings ? "Filtrando…" : "Aplicar filtros"}
+            {loadingBookings ? "Filtrando…" : "Aplicar"}
           </button>
 
           <button
             className="btn btn-secondary"
             type="button"
-            onClick={() =>
-              setFilters((current) => ({
-                ...current,
-                from: todayDateKey,
-                to: todayDateKey
-              }))
-            }
-          >
-            Hoy
-          </button>
-
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() =>
-              setFilters({
+            onClick={() => {
+              const nextFilters = {
                 q: "",
                 status: "all",
                 from: "",
                 to: ""
-              })
-            }
+              };
+              setFilters(nextFilters);
+              loadBookings(nextFilters);
+            }}
+            aria-label="Limpiar filtros"
+            title="Limpiar filtros"
           >
-            Limpiar
+            <RotateCcw size={14} aria-hidden="true" />
           </button>
         </form>
 
-        <div className="admin-toolbar-actions">
+        <div className="admin-filter-shortcuts" role="group" aria-label="Filtros rapidos">
           <button
-            className="btn btn-secondary"
             type="button"
-            onClick={handleExportCsv}
-            disabled={exporting}
+            className="btn btn-secondary"
+            onClick={() => {
+              const nextFilters = { ...filters, from: todayDateKey, to: todayDateKey };
+              setFilters(nextFilters);
+              loadBookings(nextFilters);
+            }}
           >
-            {exporting ? "Exportando…" : "Exportar CSV"}
+            Hoy
           </button>
-          <a className="btn btn-secondary" href="/">
-            Ir al Inicio
-          </a>
-          <button className="btn btn-secondary" type="button" onClick={handleLogout}>
-            Cerrar sesion
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              const nextFilters = { ...filters, from: calendarWeekStart, to: addDays(calendarWeekStart, 6) };
+              setFilters(nextFilters);
+              loadBookings(nextFilters);
+            }}
+          >
+            Semana
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              const month = getMonthRange(calendarMonth);
+              const nextFilters = { ...filters, from: month.from, to: month.to };
+              setFilters(nextFilters);
+              loadBookings(nextFilters);
+            }}
+          >
+            Mes
           </button>
         </div>
       </div>
@@ -1003,23 +1003,23 @@ export default function AdminBookingsPanel() {
       ) : null}
 
       <div className="admin-kpis">
-        <article className="admin-kpi">
+        <article className="admin-kpi kpi-total">
           <h2>Total</h2>
           <p>{stats.total}</p>
         </article>
-        <article className="admin-kpi">
+        <article className="admin-kpi kpi-pending">
           <h2>Pendientes</h2>
           <p>{stats.pending}</p>
         </article>
-        <article className="admin-kpi">
+        <article className="admin-kpi kpi-confirmed">
           <h2>Confirmadas</h2>
           <p>{stats.confirmed}</p>
         </article>
-        <article className="admin-kpi">
+        <article className="admin-kpi kpi-completed">
           <h2>Completadas</h2>
           <p>{stats.completed}</p>
         </article>
-        <article className="admin-kpi">
+        <article className="admin-kpi kpi-cancelled">
           <h2>Canceladas</h2>
           <p>{stats.cancelled}</p>
         </article>
@@ -1027,26 +1027,21 @@ export default function AdminBookingsPanel() {
 
       <section className="admin-agenda" aria-label="Agenda del dia">
         <h2>Agenda de hoy</h2>
-        {agendaToday.length === 0 ? (
-          <p className="admin-status">No hay turnos cargados para hoy.</p>
-        ) : (
-          <ul className="admin-agenda-list">
-            {agendaToday.map((booking, index) => (
-              <li key={getBookingRenderKey(booking, "agenda", index)} className="admin-agenda-item">
-                <p className="admin-agenda-time">{booking.appointment_time}</p>
-                <div>
-                  <strong>{booking.name}</strong>
-                  <p>
-                    {booking.service} · {booking.barber}
-                  </p>
-                </div>
-                <span className={`status-pill status-${booking.status || "pending"}`}>
-                  {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+
+        <div className="admin-agenda-today-grid" aria-label="Horarios de hoy">
+          {AGENDA_TIME_SLOTS.map((time) => {
+            const booking = agendaTodayByTime.get(time);
+            const status = booking?.status || "";
+
+            return (
+              <span
+                key={`agenda-today-${time}`}
+                className={`agenda-slot${booking ? " is-taken" : " is-free"}${status ? ` status-${status}` : ""}`}
+                title={booking ? `${time} · ${booking.name} · ${booking.service}` : `${time} · Disponible`}
+              />
+            );
+          })}
+        </div>
       </section>
 
       <section className="admin-weekly" aria-label="Calendario semanal">
@@ -1119,26 +1114,30 @@ export default function AdminBookingsPanel() {
                 {day.bookings.length === 0 ? (
                   <EmptyCalendarState />
                 ) : (
-                  <ul className="admin-week-list">
-                    {day.bookings.map((booking, index) => (
-                    <li
-                      key={getBookingRenderKey(booking, `week-${day.dateKey}`, index)}
-                      className={`admin-week-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
-                      draggable={updatingId !== booking.id && deletingId !== booking.id}
-                      onDragStart={(event) => handleDragStart(event, booking)}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <p className="admin-week-time">{booking.appointment_time}</p>
-                      <strong>{booking.name}</strong>
-                      <p>
-                          {booking.service} · {booking.barber}
-                        </p>
-                        <span className={`status-pill status-${booking.status || "pending"}`}>
-                          {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="admin-week-chip-list" role="list" aria-label={`Turnos del ${day.dayLabel}`}>
+                      {day.bookings.slice(0, 6).map((booking, index) => (
+                        (() => {
+                          const bookingKey = getBookingSignature(booking);
+                          return (
+                        <li
+                          key={getBookingRenderKey(booking, `week-${day.dateKey}`, index)}
+                          role="listitem"
+                          className={`admin-week-chip status-${booking.status || "pending"}${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                          draggable={updatingKey !== bookingKey && deletingKey !== bookingKey}
+                          onDragStart={(event) => handleDragStart(event, booking)}
+                          onDragEnd={handleDragEnd}
+                          title={`${booking.appointment_time} · ${booking.name} · ${booking.service}`}
+                        >
+                          <span className="chip-time">{booking.appointment_time}</span>
+                          <span className="chip-name">{getShortName(booking.name)}</span>
+                        </li>
+                          );
+                        })()
+                      ))}
+                    </ul>
+                    {day.bookings.length > 6 ? <p className="admin-week-more">+{day.bookings.length - 6} más</p> : null}
+                  </>
                 )}
               </article>
             ))}
@@ -1163,24 +1162,30 @@ export default function AdminBookingsPanel() {
                       {day.bookings.length === 0 ? (
                         <EmptyCalendarState />
                       ) : (
-                        <ul className="admin-week-barber-list">
-                          {day.bookings.map((booking, index) => (
-                            <li
-                              key={getBookingRenderKey(booking, `barber-week-${day.dateKey}`, index)}
-                              className={`admin-week-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
-                              draggable={updatingId !== booking.id && deletingId !== booking.id}
-                              onDragStart={(event) => handleDragStart(event, booking)}
-                              onDragEnd={handleDragEnd}
-                            >
-                              <p className="admin-week-time">{booking.appointment_time}</p>
-                              <strong>{booking.name}</strong>
-                              <p>{booking.service}</p>
-                              <span className={`status-pill status-${booking.status || "pending"}`}>
-                                {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        <>
+                          <ul className="admin-week-chip-list" role="list" aria-label={`Turnos de ${barberGroup.barber} ${day.dayLabel}`}>
+                            {day.bookings.slice(0, 6).map((booking, index) => (
+                              (() => {
+                                const bookingKey = getBookingSignature(booking);
+                                return (
+                              <li
+                                key={getBookingRenderKey(booking, `barber-week-${day.dateKey}`, index)}
+                                role="listitem"
+                                className={`admin-week-chip status-${booking.status || "pending"}${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                                draggable={updatingKey !== bookingKey && deletingKey !== bookingKey}
+                                onDragStart={(event) => handleDragStart(event, booking)}
+                                onDragEnd={handleDragEnd}
+                                title={`${booking.appointment_time} · ${booking.name} · ${booking.service}`}
+                              >
+                                <span className="chip-time">{booking.appointment_time}</span>
+                                <span className="chip-name">{getShortName(booking.name)}</span>
+                              </li>
+                                );
+                              })()
+                            ))}
+                          </ul>
+                          {day.bookings.length > 6 ? <p className="admin-week-more">+{day.bookings.length - 6} más</p> : null}
+                        </>
                       )}
                     </section>
                   ))}
@@ -1248,31 +1253,30 @@ export default function AdminBookingsPanel() {
                 {day.bookings.length === 0 ? (
                   <EmptyCalendarState />
                 ) : (
-                  <ul className="admin-month-list">
-                    {day.bookings.slice(0, 6).map((booking, index) => (
-                      <li
-                        key={getBookingRenderKey(booking, `month-booking-${day.dateKey}`, index)}
-                        className={`admin-month-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
-                        draggable={updatingId !== booking.id && deletingId !== booking.id}
-                        onDragStart={(event) => handleDragStart(event, booking)}
-                        onDragEnd={handleDragEnd}
-                      >
-                        <p className="admin-week-time">{booking.appointment_time}</p>
-                        <strong>{booking.name}</strong>
-                        <p>
-                          {booking.service} · {booking.barber}
-                        </p>
-                        <span className={`status-pill status-${booking.status || "pending"}`}>
-                          {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="admin-week-chip-list" role="list" aria-label={`Turnos del ${day.dayLabel}`}>
+                      {day.bookings.slice(0, 6).map((booking, index) => {
+                        const bookingKey = getBookingSignature(booking);
+                        return (
+                          <li
+                            key={getBookingRenderKey(booking, `month-booking-${day.dateKey}`, index)}
+                            role="listitem"
+                            className={`admin-week-chip status-${booking.status || "pending"}${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                            draggable={updatingKey !== bookingKey && deletingKey !== bookingKey}
+                            onDragStart={(event) => handleDragStart(event, booking)}
+                            onDragEnd={handleDragEnd}
+                            title={`${booking.appointment_time} · ${booking.name} · ${booking.service}`}
+                          >
+                            <span className="chip-time">{booking.appointment_time}</span>
+                            <span className="chip-name">{getShortName(booking.name)}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {day.bookings.length > 6 ? <p className="admin-week-more">+{day.bookings.length - 6} más</p> : null}
+                  </>
                 )}
 
-                {day.bookings.length > 6 ? (
-                  <p className="admin-month-more">+{day.bookings.length - 6} turnos</p>
-                ) : null}
               </article>
             ))}
           </div>
@@ -1288,22 +1292,22 @@ export default function AdminBookingsPanel() {
                 </header>
 
                 <ul className="admin-month-barber-list">
-                  {group.bookings.map((booking, index) => (
-                    <li
-                      key={getBookingRenderKey(booking, `month-barber-booking-${booking.dateKey}`, index)}
-                      className={`admin-month-barber-item${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
-                      draggable={updatingId !== booking.id && deletingId !== booking.id}
-                      onDragStart={(event) => handleDragStart(event, booking)}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <p className="admin-week-time">{booking.dateLabel} · {booking.appointment_time}</p>
-                      <strong>{booking.name}</strong>
-                      <p>{booking.service}</p>
-                      <span className={`status-pill status-${booking.status || "pending"}`}>
-                        {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
-                      </span>
-                    </li>
-                  ))}
+                  {group.bookings.map((booking, index) => {
+                    const bookingKey = getBookingSignature(booking);
+                    return (
+                      <li
+                        key={getBookingRenderKey(booking, `month-barber-booking-${booking.dateKey}`, index)}
+                        className={`admin-week-chip status-${booking.status || "pending"}${draggingBooking?.id === booking.id ? " is-dragging" : ""}`}
+                        draggable={updatingKey !== bookingKey && deletingKey !== bookingKey}
+                        onDragStart={(event) => handleDragStart(event, booking)}
+                        onDragEnd={handleDragEnd}
+                        title={`${booking.dateLabel} ${booking.appointment_time} · ${booking.name} · ${booking.service}`}
+                      >
+                        <span className="chip-time">{booking.appointment_time}</span>
+                        <span className="chip-name">{getShortName(booking.name)}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </article>
             ))}
@@ -1333,7 +1337,8 @@ export default function AdminBookingsPanel() {
               </tr>
             ) : (
               sortedBookings.map((booking, index) => {
-                const draftStatus = statusDrafts[booking.id] || booking.status || "pending";
+                const bookingKey = getBookingSignature(booking);
+                const draftStatus = statusDrafts[bookingKey] || booking.status || "pending";
 
                 return (
                   <tr key={getBookingRenderKey(booking, "table", index)}>
@@ -1344,8 +1349,12 @@ export default function AdminBookingsPanel() {
                     <td>{booking.barber}</td>
                     <td>{formatDate(booking.appointment_date, booking.appointment_time)}</td>
                     <td>
-                      <span className={`status-pill status-${booking.status || "pending"}`}>
-                        {BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                      <span
+                        className={`status-pill status-${booking.status || "pending"}${booking.status === "confirmed" ? " status-pill-icon" : ""}`}
+                        aria-label={BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                        title={BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
+                      >
+                        {booking.status === "confirmed" ? <Check size={13} aria-hidden="true" /> : BOOKING_STATUS_LABELS[booking.status] || "Pendiente"}
                       </span>
                     </td>
                     <td>{formatCreatedAt(booking.created_at)}</td>
@@ -1356,7 +1365,7 @@ export default function AdminBookingsPanel() {
                           onChange={(event) =>
                             setStatusDrafts((current) => ({
                               ...current,
-                              [booking.id]: event.target.value
+                              [bookingKey]: event.target.value
                             }))
                           }
                         >
@@ -1370,21 +1379,21 @@ export default function AdminBookingsPanel() {
                           className="btn btn-secondary"
                           type="button"
                           disabled={
-                            updatingId === booking.id ||
-                            deletingId === booking.id ||
+                            updatingKey === bookingKey ||
+                            deletingKey === bookingKey ||
                             draftStatus === booking.status
                           }
-                          onClick={() => handleStatusUpdate(booking.id)}
+                          onClick={() => handleStatusUpdate(booking)}
                         >
-                          {updatingId === booking.id ? "Guardando…" : "Guardar"}
+                          {updatingKey === bookingKey ? "Guardando…" : "Guardar"}
                         </button>
                         <button
                           className="btn btn-danger"
                           type="button"
-                          disabled={deletingId === booking.id || updatingId === booking.id}
-                          onClick={() => handleDeleteBooking(booking.id)}
+                          disabled={deletingKey === bookingKey || updatingKey === bookingKey}
+                          onClick={() => handleDeleteBooking(booking)}
                         >
-                          {deletingId === booking.id ? "Eliminando…" : "Eliminar"}
+                          {deletingKey === bookingKey ? "Eliminando…" : "Eliminar"}
                         </button>
                       </div>
                     </td>

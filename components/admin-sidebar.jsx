@@ -2,12 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, CalendarDays, Globe, LogOut, Scissors } from "lucide-react";
+import { BarChart3, CalendarDays, Scissors } from "lucide-react";
 
 const ADMIN_LINKS = [
   { href: "/admin/reservas", label: "Reservas", icon: CalendarDays },
-  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 },
-  { href: "/", label: "Ver sitio", icon: Globe }
+  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 }
 ];
 
 export default function AdminSidebar() {
@@ -41,14 +40,6 @@ export default function AdminSidebar() {
         })}
       </nav>
       
-      <div className="admin-sidebar-footer">
-        <a href="/admin/reservas" className="admin-sidebar-link">
-          <span className="link-icon" aria-hidden="true">
-            <LogOut size={18} />
-          </span>
-          <span className="link-label">Cerrar sesión</span>
-        </a>
-      </div>
     </aside>
   );
 }
