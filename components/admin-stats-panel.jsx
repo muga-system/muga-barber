@@ -69,6 +69,50 @@ const TOOLTIP_STYLE = {
   color: "var(--tooltip-text)"
 };
 
+function normalizeBookingRecord(record) {
+  return {
+    ...record,
+    appointment_date: record.appointment_date || record.date || "",
+    appointment_time: record.appointment_time || record.time || "",
+    created_at: record.created_at || record.createdAt || new Date().toISOString(),
+    updated_at: record.updated_at || record.updatedAt || record.created_at || record.createdAt || new Date().toISOString(),
+    status: record.status || "pending"
+  };
+}
+
+function getLocalBookingsSafe() {
+  try {
+    const stored = localStorage.getItem("muga_bookings");
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map(normalizeBookingRecord);
+  } catch {
+    return [];
+  }
+}
+
+function mergeBookings(primaryBookings, secondaryBookings) {
+  const merged = [];
+  const seen = new Set();
+
+  [...primaryBookings, ...secondaryBookings].forEach((booking) => {
+    const normalized = normalizeBookingRecord(booking);
+    const signature = `${normalized.id}-${normalized.created_at}-${normalized.appointment_date}-${normalized.appointment_time}`;
+
+    if (seen.has(signature)) {
+      return;
+    }
+
+    seen.add(signature);
+    merged.push(normalized);
+  });
+
+  return merged;
+}
+
 export default function AdminStatsPanel() {
   const todayDateKey = new Date().toISOString().slice(0, 10);
   const [authState, setAuthState] = useState("checking");
@@ -112,9 +156,12 @@ export default function AdminStatsPanel() {
         throw new Error(payload.error || "No se pudieron cargar las estadisticas.");
       }
 
-      const nextBookings = payload.bookings || [];
-      setBookings(nextBookings);
-      setStatusText(`Reservas analizadas: ${nextBookings.length}`);
+      const nextBookings = (payload.bookings || []).map(normalizeBookingRecord);
+      const localBookings = getLocalBookingsSafe();
+      const mergedBookings = mergeBookings(nextBookings, localBookings);
+
+      setBookings(mergedBookings);
+      setStatusText(`Reservas analizadas: ${mergedBookings.length}`);
     } catch (error) {
       setBookings([]);
       setStatusText(error.message || "No se pudieron cargar las estadisticas.");
